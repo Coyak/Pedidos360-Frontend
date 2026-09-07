@@ -38,15 +38,15 @@ function App() {
         <div className="hero-card">
           <h2>Plataforma de Gestión de Pedidos</h2>
           <p className="subtitle">
-            Frontend modular estructurado con React + Vite, autenticación Microsoft Entra ID (MSAL) y consumo seguro de API Gateway en AWS.
+            Frontend modular estructurado con React + Vite, autenticación Microsoft Entra ID (MSAL) y consumo seguro de API Gateway HTTP en AWS con JWT Authorizer nativo.
           </p>
 
           <div className="badge-row">
             <span className="tech-badge">React 18</span>
             <span className="tech-badge">Vite</span>
             <span className="tech-badge">MSAL React</span>
-            <span className="tech-badge">AWS API Gateway</span>
-            <span className="tech-badge version-badge">v1.2.0</span>
+            <span className="tech-badge">AWS HTTP API Gateway</span>
+            <span className="tech-badge version-badge">v1.2.2</span>
           </div>
 
           <UnauthenticatedTemplate>
@@ -65,7 +65,7 @@ function App() {
       </main>
 
       <footer className="app-footer">
-        <p>Pedidos360 Frontend - Versión 1.2.0 (Desarrollo Cloud)</p>
+        <p>Pedidos360 Frontend - Versión 1.2.2 (Desarrollo Cloud)</p>
       </footer>
     </div>
   );

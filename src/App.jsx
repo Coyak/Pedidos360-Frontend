@@ -1,6 +1,7 @@
 import React from 'react';
 import { useMsal, AuthenticatedTemplate, UnauthenticatedTemplate } from '@azure/msal-react';
 import LoginButton from './components/LoginButton';
+import Catalogo from './components/Catalogo';
 import './App.css';
 
 function App() {
@@ -37,38 +38,34 @@ function App() {
         <div className="hero-card">
           <h2>Plataforma de Gestión de Pedidos</h2>
           <p className="subtitle">
-            Frontend modular estructurado con React + Vite y autenticación empresarial Microsoft Entra ID (MSAL).
+            Frontend modular estructurado con React + Vite, autenticación Microsoft Entra ID (MSAL) y consumo seguro de API Gateway en AWS.
           </p>
 
           <div className="badge-row">
             <span className="tech-badge">React 18</span>
             <span className="tech-badge">Vite</span>
             <span className="tech-badge">MSAL React</span>
-            <span className="tech-badge">Azure AD</span>
-            <span className="tech-badge version-badge">v1.1.0</span>
+            <span className="tech-badge">AWS API Gateway</span>
+            <span className="tech-badge version-badge">v1.2.0</span>
           </div>
 
           <UnauthenticatedTemplate>
             <div className="info-box">
               <h3>🔒 Autenticación Requerida</h3>
               <p>
-                Haz clic en el botón <strong>"Iniciar Sesión con Microsoft"</strong> para autenticarte mediante tu cuenta empresarial/institucional de Azure AD.
+                Haz clic en el botón <strong>"Iniciar Sesión con Microsoft"</strong> para autenticarte mediante tu cuenta de Azure AD y acceder a las APIs protegidas en AWS.
               </p>
             </div>
           </UnauthenticatedTemplate>
 
           <AuthenticatedTemplate>
-            <div className="info-box success-box">
-              <h3>✅ Autenticación Exitosa</h3>
-              <p>Has iniciado sesión como <strong>{activeAccount?.name}</strong> ({activeAccount?.username}).</p>
-              <pre className="account-json">{JSON.stringify(activeAccount, null, 2)}</pre>
-            </div>
+            <Catalogo />
           </AuthenticatedTemplate>
         </div>
       </main>
 
       <footer className="app-footer">
-        <p>Pedidos360 Frontend - Versión 1.1.0 (Desarrollo Cloud)</p>
+        <p>Pedidos360 Frontend - Versión 1.2.0 (Desarrollo Cloud)</p>
       </footer>
     </div>
   );

@@ -96,7 +96,7 @@
   border: 1px solid var(--bg-card-border);
   border-radius: 16px;
   padding: 2.5rem;
-  max-width: 680px;
+  max-width: 720px;
   width: 100%;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
 }
@@ -158,26 +158,107 @@
   line-height: 1.5;
 }
 
-.info-box code {
-  background: rgba(0, 0, 0, 0.3);
+/* Estilos de Componente Catálogo & API */
+.catalogo-container {
+  margin-top: 1rem;
+}
+
+.card-header h3 {
+  font-size: 1.2rem;
+  color: #f8fafc;
+  margin-bottom: 0.25rem;
+}
+
+.card-subtitle {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.card-subtitle code {
+  background: rgba(0, 0, 0, 0.4);
   color: var(--primary-accent);
   padding: 0.15rem 0.4rem;
   border-radius: 4px;
-  font-family: monospace;
+  word-break: break-all;
 }
 
-.success-box {
-  border-left-color: var(--success-color);
+.status-box {
+  background: rgba(15, 23, 42, 0.7);
+  border-radius: 10px;
+  padding: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.account-json {
+.loading-box {
+  text-align: center;
+  color: var(--primary-accent);
+  font-size: 0.95rem;
+  padding: 2rem;
+}
+
+.error-box {
+  border-left: 4px solid #ef4444;
+  color: #fca5a5;
+}
+
+.success-api-box {
+  border-left: 4px solid var(--success-color);
+}
+
+.api-badge-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 0.3rem 0.75rem;
+  border-radius: 20px;
+  margin-bottom: 1rem;
+}
+
+.dot.online {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+.json-display {
   background: #090d16;
   padding: 1rem;
-  border-radius: 6px;
-  font-size: 0.8rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
   color: #a7f3d0;
   overflow-x: auto;
-  margin-top: 0.75rem;
+  margin-top: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.token-details {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.token-details summary {
+  cursor: pointer;
+  color: var(--primary-accent);
+  font-weight: 500;
+}
+
+.token-text {
+  word-break: break-all;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.75rem;
+  border-radius: 6px;
+  margin-top: 0.5rem;
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: #cbd5e1;
 }
 
 .app-footer {

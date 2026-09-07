@@ -10,7 +10,7 @@ export const msalConfig = {
     // IMPORTANTE: Reemplaza 'TU_CLIENT_ID_AQUI' con el Application (client) ID
     // obtenido desde tu Registro de Aplicaciones en Azure Portal / Entra ID.
     // =========================================================================
-    clientId: "TU_CLIENT_ID_AQUI", 
+    clientId: "5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4", 
     authority: "https://login.microsoftonline.com/e5372bf0-c5e3-4286-887c-79069f209c1f", // Tenant ID de Pedidos360
     redirectUri: "http://localhost:5173",
     postLogoutRedirectUri: "http://localhost:5173",

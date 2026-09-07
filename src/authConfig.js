@@ -47,12 +47,12 @@ export const msalConfig = {
  * Scopes requeridos para iniciar sesión y emitir el token con la audiencia de la API
  */
 export const loginRequest = {
-  scopes: ["api://5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4/.default"],
+  scopes: ["5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4/.default"],
 };
 
 /**
  * Scopes requeridos para invocar las APIs protegidas del backend en AWS
  */
 export const apiRequest = {
-  scopes: ["api://5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4/.default"],
+  scopes: ["5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4/.default"],
 };

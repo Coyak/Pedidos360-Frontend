@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useMsal } from '@azure/msal-react';
-import { loginRequest } from '../authConfig';
+import { apiRequest } from '../authConfig';
 
 /**
  * Componente Catalogo
- * Obtiene el token JWT de MSAL mediante acquireTokenSilent (o acquireTokenPopup como fallback)
+ * Obtiene el token JWT de MSAL mediante acquireTokenSilent especificando explícitamente el scope de la API
  * e invoca el endpoint protegido de la API Gateway en AWS.
  */
 export const Catalogo = () => {
@@ -20,8 +20,9 @@ export const Catalogo = () => {
     const fetchApiData = async () => {
       if (accounts.length === 0) return;
 
+      // Solicitud explícita con el scope del Client ID y la cuenta activa
       const request = {
-        ...loginRequest,
+        scopes: ["5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4/.default"],
         account: accounts[0],
       };
 
@@ -29,7 +30,7 @@ export const Catalogo = () => {
         setLoading(true);
         setError(null);
 
-        // 1. Intentar adquirir el token JWT silenciosamente
+        // 1. Intentar adquirir el token JWT silenciosamente con el scope de la API
         let tokenResponse;
         try {
           tokenResponse = await instance.acquireTokenSilent(request);
@@ -82,7 +83,7 @@ export const Catalogo = () => {
 
       {error && (
         <div className="status-box error-box">
-          <h4>❌ Error de Comunicación</h4>
+          <h4>❌ Error de Comunicación (HTTP Error)</h4>
           <p>{error}</p>
         </div>
       )}

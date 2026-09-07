@@ -4,7 +4,14 @@ Aplicación web frontend para la plataforma de gestión de pedidos **Pedidos360*
 
 ## 🚀 Descripción del Proyecto
 
-Pedidos360 Frontend es la interfaz de usuario moderna basada en Single Page Application (SPA) que interactúa con la arquitectura de microservicios alojada en AWS. Permite a los usuarios autenticarse mediante Microsoft Entra ID (Azure AD), gestionar el catálogo de productos y visualizar el seguimiento de pedidos en tiempo real.
+Pedidos360 Frontend es la interfaz de usuario basada en Single Page Application (SPA) que interactúa con la arquitectura de microservicios alojada en AWS. Permite a los usuarios autenticarse mediante Microsoft Entra ID (Azure AD), gestionar el catálogo de productos y visualizar el seguimiento de pedidos en tiempo real.
+
+## ✨ Características
+
+- **Autenticación Empresarial con Azure AD**: Integración completa con Microsoft Entra ID mediante los SDKs oficiales `@azure/msal-browser` y `@azure/msal-react`.
+- **Flujo de Inicio de Sesión Modal (Popup)**: Uso del componente modular `<LoginButton />` que invoca `instance.loginPopup()` con los permisos (scopes) requeridos (`User.Read`).
+- **Control de Estado de Autenticación**: Renderizado condicional mediante `<MsalProvider>`, `<AuthenticatedTemplate>` y `<UnauthenticatedTemplate>` para proteger rutas y componentes.
+- **Arquitectura SPA de Alto Rendimiento**: Desarrollada con React 18 y empacada con Vite para cargas ultrarrápidas en desarrollo y producción.
 
 ## 🛠️ Tecnologías Utilizadas
 
@@ -37,7 +44,7 @@ Pedidos360 Frontend es la interfaz de usuario moderna basada en Single Page Appl
    ```bash
    npm run dev
    ```
-   La aplicación estará disponible en `http://localhost:5173`.
+   La aplicación estará disponible por defecto en `http://localhost:5173`.
 
 4. **Construir para producción**:
    ```bash
@@ -46,5 +53,6 @@ Pedidos360 Frontend es la interfaz de usuario moderna basada en Single Page Appl
 
 ## 🏷️ Versionamiento Semántico
 
-Este proyecto utiliza el esquema de **Semantic Versioning 2.0.0 (SemVer)**:
+Este proyecto sigue la especificación de **Semantic Versioning 2.0.0 (SemVer)**:
+- **v1.1.0**: Integración de `MsalProvider`, creación del componente `LoginButton` y flujo de inicio de sesión con Azure AD (MSAL).
 - **v1.0.0**: Estructura base inicial con React, Vite y configuración de autenticación MSAL.

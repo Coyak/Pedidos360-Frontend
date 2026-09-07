@@ -1,21 +1,15 @@
 import React from 'react';
 import { useMsal, AuthenticatedTemplate, UnauthenticatedTemplate } from '@azure/msal-react';
-import { loginRequest } from './authConfig';
+import LoginButton from './components/LoginButton';
 import './App.css';
 
 function App() {
   const { instance, accounts } = useMsal();
   const activeAccount = accounts[0];
 
-  const handleLogin = () => {
-    instance.loginPopup(loginRequest).catch((e) => {
-      console.error(e);
-    });
-  };
-
   const handleLogout = () => {
     instance.logoutPopup().catch((e) => {
-      console.error(e);
+      console.error("Error al cerrar sesión:", e);
     });
   };
 
@@ -34,9 +28,7 @@ function App() {
             </button>
           </AuthenticatedTemplate>
           <UnauthenticatedTemplate>
-            <button className="btn btn-primary" onClick={handleLogin}>
-              Iniciar Sesión (Azure AD)
-            </button>
+            <LoginButton />
           </UnauthenticatedTemplate>
         </div>
       </header>
@@ -45,30 +37,30 @@ function App() {
         <div className="hero-card">
           <h2>Plataforma de Gestión de Pedidos</h2>
           <p className="subtitle">
-            Frontend estructurado con React + Vite y autenticación empresarial Microsoft Entra ID (MSAL).
+            Frontend modular estructurado con React + Vite y autenticación empresarial Microsoft Entra ID (MSAL).
           </p>
 
           <div className="badge-row">
             <span className="tech-badge">React 18</span>
             <span className="tech-badge">Vite</span>
-            <span className="tech-badge">MSAL Browser</span>
+            <span className="tech-badge">MSAL React</span>
             <span className="tech-badge">Azure AD</span>
-            <span className="tech-badge version-badge">v1.0.0</span>
+            <span className="tech-badge version-badge">v1.1.0</span>
           </div>
 
           <UnauthenticatedTemplate>
             <div className="info-box">
               <h3>🔒 Autenticación Requerida</h3>
               <p>
-                Por favor, configura tu <code>Client ID</code> en <code>src/authConfig.js</code> e inicia sesión para acceder al panel de control y APIs de la plataforma.
+                Haz clic en el botón <strong>"Iniciar Sesión con Microsoft"</strong> para autenticarte mediante tu cuenta empresarial/institucional de Azure AD.
               </p>
             </div>
           </UnauthenticatedTemplate>
 
           <AuthenticatedTemplate>
             <div className="info-box success-box">
-              <h3>✅ Sesión Activa</h3>
-              <p>Has iniciado sesión correctamente como <strong>{activeAccount?.username}</strong>.</p>
+              <h3>✅ Autenticación Exitosa</h3>
+              <p>Has iniciado sesión como <strong>{activeAccount?.name}</strong> ({activeAccount?.username}).</p>
               <pre className="account-json">{JSON.stringify(activeAccount, null, 2)}</pre>
             </div>
           </AuthenticatedTemplate>
@@ -76,7 +68,7 @@ function App() {
       </main>
 
       <footer className="app-footer">
-        <p>Pedidos360 Frontend - Evaluación 1 (Desarrollo Cloud)</p>
+        <p>Pedidos360 Frontend - Versión 1.1.0 (Desarrollo Cloud)</p>
       </footer>
     </div>
   );

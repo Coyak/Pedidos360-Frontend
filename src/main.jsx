@@ -6,6 +6,7 @@ import { msalConfig } from './authConfig';
 import App from './App';
 import './index.css';
 
+// Inicializar la instancia principal de MSAL con la configuración declarada
 const msalInstance = new PublicClientApplication(msalConfig);
 
 ReactDOM.createRoot(document.getElementById('root')).render(

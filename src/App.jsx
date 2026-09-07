@@ -2,6 +2,7 @@ import React from 'react';
 import { useMsal, AuthenticatedTemplate, UnauthenticatedTemplate } from '@azure/msal-react';
 import LoginButton from './components/LoginButton';
 import Catalogo from './components/Catalogo';
+import Carrito from './components/Carrito';
 import './App.css';
 
 function App() {
@@ -38,7 +39,7 @@ function App() {
         <div className="hero-card">
           <h2>Plataforma de Gestión de Pedidos</h2>
           <p className="subtitle">
-            Frontend modular estructurado con React + Vite, autenticación Microsoft Entra ID (MSAL) y consumo seguro de API Gateway HTTP en AWS con JWT Authorizer nativo.
+            Frontend modular estructurado con React + Vite, autenticación Microsoft Entra ID (MSAL) e integración multi-servicio en AWS (Catálogo & Carrito de Compras).
           </p>
 
           <div className="badge-row">
@@ -46,7 +47,7 @@ function App() {
             <span className="tech-badge">Vite</span>
             <span className="tech-badge">MSAL React</span>
             <span className="tech-badge">AWS HTTP API Gateway</span>
-            <span className="tech-badge version-badge">v1.2.2</span>
+            <span className="tech-badge version-badge">v1.3.0</span>
           </div>
 
           <UnauthenticatedTemplate>
@@ -60,12 +61,13 @@ function App() {
 
           <AuthenticatedTemplate>
             <Catalogo />
+            <Carrito />
           </AuthenticatedTemplate>
         </div>
       </main>
 
       <footer className="app-footer">
-        <p>Pedidos360 Frontend - Versión 1.2.2 (Desarrollo Cloud)</p>
+        <p>Pedidos360 Frontend - Versión 1.3.0 (Desarrollo Cloud)</p>
       </footer>
     </div>
   );

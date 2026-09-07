@@ -9,8 +9,8 @@ Pedidos360 Frontend es la interfaz de usuario basada en Single Page Application 
 ## ✨ Características
 
 - **Autenticación Empresarial con Azure AD**: Integración completa con Microsoft Entra ID mediante los SDKs oficiales `@azure/msal-browser` y `@azure/msal-react`.
-- **Consumo Seguro de API Gateway en AWS**: Componente `<Catalogo />` que obtiene silenciosamente tokens JWT mediante `acquireTokenSilent` y envía solicitudes HTTP autorizadas (`Authorization: Bearer <token>`) al API Gateway (`https://80nkiz7e32.execute-api.us-east-1.amazonaws.com/v1/api/status`).
-- **Flujo de Inicio de Sesión Modal (Popup)**: Componente modular `<LoginButton />` que invoca `instance.loginPopup()` con scopes OAuth 2.0 / OIDC.
+- **Consumo Seguro de API Gateway en AWS**: Componente `<Catalogo />` que obtiene silenciosamente tokens JWT mediante `acquireTokenSilent` usando el scope nativo de la API (`api://5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4/.default`) y envía solicitudes HTTP autorizadas (`Authorization: Bearer <token>`) al API Gateway (`https://80nkiz7e32.execute-api.us-east-1.amazonaws.com/v1/api/status`).
+- **Flujo de Inicio de Sesión Modal (Popup)**: Componente modular `<LoginButton />` que invoca `instance.loginPopup()` con los scopes configurados en `authConfig.js`.
 - **Control de Estado de Autenticación**: Renderizado condicional con `<MsalProvider>`, `<AuthenticatedTemplate>` y `<UnauthenticatedTemplate>` para garantizar que la API solo sea consumida cuando exista una sesión válida.
 - **Arquitectura SPA de Alto Rendimiento**: Desarrollada con React 18 y empacada con Vite.
 
@@ -25,9 +25,9 @@ Pedidos360 Frontend es la interfaz de usuario basada en Single Page Application 
 
 1. **Node.js**: Asegúrate de tener instalado Node.js (versión 18 o superior).
 2. **Azure AD / Microsoft Entra ID App Registration**:
-   - Obtén el **Application (Client) ID** de tu registro de aplicación en Azure AD.
-   - Configura el archivo `src/authConfig.js` ingresando tu Client ID en la variable `clientId` (`5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4`).
-   - El Tenant ID configurado es: `e5372bf0-c5e3-4286-887c-79069f209c1f`.
+   - Application (Client) ID configurado: `5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4`.
+   - Tenant ID configurado: `e5372bf0-c5e3-4286-887c-79069f209c1f`.
+   - Scope expuesto para autorización: `api://5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4/.default`.
 
 ## 📦 Instalación y Ejecución Local
 
@@ -55,6 +55,7 @@ Pedidos360 Frontend es la interfaz de usuario basada en Single Page Application 
 ## 🏷️ Versionamiento Semántico
 
 Este proyecto sigue la especificación de **Semantic Versioning 2.0.0 (SemVer)**:
+- **v1.2.1 (Patch Fix)**: Corrección de scope MSAL a `api://5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4/.default` solucionando el error HTTP 401 (Unauthorized) al solicitar el token correcto para el backend en AWS API Gateway.
 - **v1.2.0**: Consumo seguro del API Gateway en AWS mediante tokens JWT autorizados en el header `Authorization: Bearer <token>` a través del componente `<Catalogo />`.
 - **v1.1.0**: Integración de `MsalProvider`, creación del componente `LoginButton` y flujo de inicio de sesión con Azure AD (MSAL).
 - **v1.0.0**: Estructura base inicial con React, Vite y configuración de autenticación MSAL.

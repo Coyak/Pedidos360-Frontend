@@ -6,10 +6,6 @@ import { LogLevel } from "@azure/msal-browser";
  */
 export const msalConfig = {
   auth: {
-    // =========================================================================
-    // IMPORTANTE: Reemplaza 'TU_CLIENT_ID_AQUI' con el Application (client) ID
-    // obtenido desde tu Registro de Aplicaciones en Azure Portal / Entra ID.
-    // =========================================================================
     clientId: "5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4", 
     authority: "https://login.microsoftonline.com/e5372bf0-c5e3-4286-887c-79069f209c1f", // Tenant ID de Pedidos360
     redirectUri: "http://localhost:5173",
@@ -18,7 +14,7 @@ export const msalConfig = {
   },
   cache: {
     cacheLocation: "sessionStorage", // Guarda el estado en sessionStorage de la pestaña actual
-    storeAuthStateInCookie: false, // Innecesario salvo en navegadores legacy
+    storeAuthStateInCookie: false,
   },
   system: {
     loggerOptions: {
@@ -48,15 +44,15 @@ export const msalConfig = {
 };
 
 /**
- * Scopes requeridos para iniciar sesión y leer el perfil básico de usuario
+ * Scopes requeridos para iniciar sesión y emitir el token con la audiencia de la API
  */
 export const loginRequest = {
-  scopes: ["User.Read"],
+  scopes: ["api://5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4/.default"],
 };
 
 /**
- * Scopes requeridos para invocar las APIs protegidas del backend
+ * Scopes requeridos para invocar las APIs protegidas del backend en AWS
  */
 export const apiRequest = {
-  scopes: ["api://TU_CLIENT_ID_AQUI/access_as_user"],
+  scopes: ["api://5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4/.default"],
 };

@@ -1,10 +1,11 @@
 import React from 'react';
 import { useMsal } from '@azure/msal-react';
 import { loginRequest } from '../authConfig';
+import { MicrosoftIcon } from './Icons';
 
 /**
  * Componente de botón para iniciar sesión con Microsoft Entra ID (Azure AD)
- * mediante el flujo de ventana emergente (Popup).
+ * mediante el flujo de ventana emergente (Popup), utilizando el logo oficial SVG de Microsoft.
  */
 export const LoginButton = () => {
   const { instance } = useMsal();
@@ -16,8 +17,9 @@ export const LoginButton = () => {
   };
 
   return (
-    <button className="btn btn-primary" onClick={handleLogin}>
-      🔑 Iniciar Sesión con Microsoft
+    <button className="btn btn-microsoft" onClick={handleLogin}>
+      <MicrosoftIcon size={18} />
+      <span>Iniciar Sesión con Microsoft</span>
     </button>
   );
 };

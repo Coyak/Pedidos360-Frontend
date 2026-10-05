@@ -57,6 +57,7 @@ Pedidos360 Frontend es la interfaz de usuario basada en Single Page Application 
 ## 🏷️ Versionamiento Semántico
 
 Este proyecto sigue la especificación de **Semantic Versioning 2.0.0 (SemVer)**:
+- **v1.4.0**: Rediseño visual integral de la UI con sistema de diseño moderno, catálogo interactivo con búsqueda y filtros por categoría, drawer lateral para carrito de compras y modal interactivo de confirmación de pedido con trazabilidad técnica de AWS API Gateway y Microsoft Entra ID (HTTP 201 Created y token JWT).
 - **v1.3.0**: Incorporación del componente `<Carrito />` para el registro transaccional de pedidos de compra mediante peticiones `POST /v1/api/carrito/pedidos` con tokens JWT autorizados.
 - **v1.2.2 (Patch Fix)**: Migración de endpoint de consulta a la nueva API HTTP Gateway en AWS (`https://op6erfwwmh.execute-api.us-east-1.amazonaws.com/v1/api/status`).
 - **v1.2.1**: Corrección de scope MSAL a `5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4/.default`.

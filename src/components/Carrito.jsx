@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { CartIcon, CloseIcon, TrashIcon, EmptyBoxIcon, ShieldCheckIcon } from './Icons';
 
+import { getApiEndpoints } from '../config/apiConfig';
+
 export const Carrito = ({
   isOpen,
   onClose,
@@ -18,8 +20,9 @@ export const Carrito = ({
   const [errorMessage, setErrorMessage] = useState(null);
   const [carritoStatus, setCarritoStatus] = useState(null);
 
-  const CARRITO_STATUS_URL = 'https://op6erfwwmh.execute-api.us-east-1.amazonaws.com/v1/api/carrito/status';
-  const CARRITO_PEDIDOS_URL = 'https://op6erfwwmh.execute-api.us-east-1.amazonaws.com/v1/api/carrito/pedidos';
+  const endpoints = getApiEndpoints();
+  const CARRITO_STATUS_URL = endpoints.carritoStatus;
+  const CARRITO_PEDIDOS_URL = endpoints.carritoPedidos;
 
   // Sincronizar email con cuenta activa de Microsoft Entra ID
   useEffect(() => {

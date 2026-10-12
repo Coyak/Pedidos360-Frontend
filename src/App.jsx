@@ -4,8 +4,9 @@ import LoginButton from './components/LoginButton';
 import Catalogo from './components/Catalogo';
 import Carrito from './components/Carrito';
 import OrderSuccessModal from './components/OrderSuccessModal';
+import CloudConsoleModal from './components/CloudConsoleModal';
 import { initialProducts } from './data/products';
-import { SearchIcon, CartIcon, CloseIcon, CloudIcon, ShieldCheckIcon } from './components/Icons';
+import { SearchIcon, CartIcon, CloseIcon, CloudIcon, ShieldCheckIcon, QueueIcon } from './components/Icons';
 import './App.css';
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
     }
   ]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isCloudConsoleOpen, setIsCloudConsoleOpen] = useState(false);
   const [completedOrderData, setCompletedOrderData] = useState(null);
   const [showArchDetails, setShowArchDetails] = useState(false);
 
@@ -127,6 +129,15 @@ function App() {
         {/* Acciones y Autenticación de Usuario */}
         <div className="header-right">
           <button
+            className="cloud-console-nav-btn"
+            onClick={() => setIsCloudConsoleOpen(true)}
+            title="Abrir Consola RabbitMQ, Auditoría SHA-256 y Microservicios"
+          >
+            <QueueIcon size={17} color="#38bdf8" />
+            <span className="console-nav-text">Consola RabbitMQ & Cloud</span>
+          </button>
+
+          <button
             className="cart-nav-btn"
             onClick={() => setIsCartOpen(true)}
             aria-label="Abrir carrito de compras"
@@ -174,21 +185,24 @@ function App() {
           </div>
           <h2>Equipamiento Tecnológico de Alto Rendimiento</h2>
           <p>
-            Plataforma e-commerce desacoplada y securizada con <strong>Microsoft Entra ID (Azure AD)</strong> y 
-            respaldada por microservicios en <strong>AWS HTTP API Gateway & EC2</strong>.
+            Plataforma e-commerce desacoplada y securizada con <strong>Microsoft Entra ID (Azure AD)</strong>, 
+            perímetro en <strong>AWS HTTP API Gateway</strong> y mensajería distribuida con <strong>Clúster RabbitMQ</strong>.
           </p>
           <div className="hero-badges-row">
             <span className="tech-badge aws-chip">
-              <CloudIcon size={15} /> AWS HTTP API Gateway
+              <CloudIcon size={15} /> AWS API Gateway
             </span>
-            <span className="tech-badge spring-chip">
-              Spring Boot Java 17
+            <span className="tech-badge rabbit-chip" style={{ background: 'rgba(249, 115, 22, 0.15)', color: '#ea580c', border: '1px solid rgba(249, 115, 22, 0.3)' }}>
+              <QueueIcon size={15} /> Clúster RabbitMQ 2 Nodos
+            </span>
+            <span className="tech-badge audit-chip" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#059669', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+              <ShieldCheckIcon size={15} /> Auditoría SHA-256
             </span>
             <span className="tech-badge azure-chip">
               <ShieldCheckIcon size={15} /> Azure AD JWT Token
             </span>
-            <span className="tech-badge react-chip">
-              React 18 + Vite
+            <span className="tech-badge spring-chip">
+              5 Microservicios Spring Boot
             </span>
           </div>
         </div>
@@ -223,12 +237,18 @@ function App() {
         onClose={() => setCompletedOrderData(null)}
       />
 
-      {/* 6. Panel Desplegable de Arquitectura Cloud */}
+      {/* 6. Consola de Microservicios & RabbitMQ */}
+      <CloudConsoleModal
+        isOpen={isCloudConsoleOpen}
+        onClose={() => setIsCloudConsoleOpen(false)}
+      />
+
+      {/* 7. Panel Desplegable de Arquitectura Cloud */}
       <section className="architecture-bar">
         <div className="arch-bar-header" onClick={() => setShowArchDetails(!showArchDetails)}>
           <div className="arch-title">
             <CloudIcon size={18} color="var(--primary-accent)" />
-            <span>Diagrama de Flujo e Integración Cloud Native (AWS + Azure)</span>
+            <span>Diagrama de Flujo e Integración Cloud Native (AWS + Azure + RabbitMQ)</span>
           </div>
           <button className="btn-toggle-arch">
             {showArchDetails ? 'Ocultar' : 'Ver Detalle de Arquitectura'}
@@ -241,25 +261,37 @@ function App() {
               <div className="arch-step-card">
                 <span className="step-num">1</span>
                 <h4>Azure AD (Entra ID)</h4>
-                <p>El cliente se autentica vía OAuth2/OIDC mediante el SDK oficial de MSAL, adquiriendo un token JWT firmado con el Client ID de Pedidos360.</p>
+                <p>Autenticación OAuth2/OIDC con PKCE vía MSAL. Emite JWT firmado con el Client ID de Pedidos360.</p>
               </div>
 
               <div className="arch-step-card">
                 <span className="step-num">2</span>
-                <h4>AWS HTTP API Gateway</h4>
-                <p>El frontend envía peticiones HTTPS con el header <code>Authorization: Bearer &lt;token&gt;</code>. AWS valida nativamente la firma con las claves públicas de Microsoft.</p>
+                <h4>AWS API Gateway</h4>
+                <p>Perímetro de red con JWT Authorizer nativo. Valida firma y audiencia; rechaza 401 si no hay token.</p>
               </div>
 
               <div className="arch-step-card">
                 <span className="step-num">3</span>
-                <h4>Microservicio Catálogo (:8080)</h4>
-                <p>Spring Boot Resource Server expone los endpoints <code>/v1/api/status</code> y <code>/v1/api/productos</code> verificando emisor y audiencia.</p>
+                <h4>Microservicio Carrito (:8081)</h4>
+                <p>Recibe la transacción en <code>/carrito/pedidos</code> y publica el evento <code>pedidos.pedido.creado</code> en RabbitMQ.</p>
               </div>
 
               <div className="arch-step-card">
                 <span className="step-num">4</span>
-                <h4>Microservicio Carrito (:8081)</h4>
-                <p>Recibe la transacción en <code>/v1/api/carrito/pedidos</code>, procesa los items del carrito y genera un número de pedido con respuesta HTTP 201 Created.</p>
+                <h4>Clúster RabbitMQ (2 Nodos)</h4>
+                <p>Exchange topic <code>pedidos.exchange</code> enruta a 3 colas de dominio con sus 3 DLQs vía <code>pedidos.dlx.exchange</code>.</p>
+              </div>
+
+              <div className="arch-step-card">
+                <span className="step-num">5</span>
+                <h4>Catálogo (:8080) & Notificaciones (:8082)</h4>
+                <p>Consumen eventos con ACK manual; Catálogo descuenta inventario y Notificaciones despacha el correo.</p>
+              </div>
+
+              <div className="arch-step-card">
+                <span className="step-num">6</span>
+                <h4>Auditoría (:8083) & Admin (:8084)</h4>
+                <p>Auditoría sella transacciones con Hash SHA-256 inmutable. Admin expone API REST para gestionar colas.</p>
               </div>
             </div>
           </div>

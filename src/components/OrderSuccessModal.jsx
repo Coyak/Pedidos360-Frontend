@@ -113,6 +113,39 @@ export const OrderSuccessModal = ({ orderData, onClose }) => {
                   <h5>Respuesta JSON de Spring Boot (`carrito-api`):</h5>
                   <pre className="json-code-block">{JSON.stringify(response, null, 2)}</pre>
                 </div>
+
+                <div className="tech-section rabbitmq-trace-section">
+                  <div className="tech-section-header">
+                    <span className="tech-badge rabbit-badge" style={{ background: '#f97316', color: '#fff' }}>🐇 RabbitMQ Asynchronous Dispatch</span>
+                    <span className="endpoint-code">pedidos.exchange &rarr; pedidos.pedido.creado</span>
+                  </div>
+                  <div className="pipeline-steps-list">
+                    <div className="pipeline-step-item">
+                      <span className="step-indicator done">✓</span>
+                      <div>
+                        <strong>1. Catálogo API (:8080)</strong> &bull; Cola: <code>pedidos.stock.queue</code>
+                        <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>Descuento de stock en memoria/DB con confirmación manual (ACK).</p>
+                      </div>
+                    </div>
+                    <div className="pipeline-step-item">
+                      <span className="step-indicator done">✓</span>
+                      <div>
+                        <strong>2. Notificaciones API (:8082)</strong> &bull; Cola: <code>pedidos.notificaciones.queue</code>
+                        <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>Despacho de correo al cliente <code>{payload?.clienteEmail}</code>.</p>
+                      </div>
+                    </div>
+                    <div className="pipeline-step-item">
+                      <span className="step-indicator done">✓</span>
+                      <div>
+                        <strong>3. Auditoría API (:8083)</strong> &bull; Cola: <code>pedidos.auditoria.queue</code>
+                        <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>Generación de Hash SHA-256 criptográfico inmutable para no repudio.</p>
+                      </div>
+                    </div>
+                  </div>
+                  <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.5rem' }}>
+                    *En caso de fallo en cualquier consumidor, el mensaje se redirige a su respectiva <strong>DLQ</strong> vía <code>pedidos.dlx.exchange</code>.
+                  </small>
+                </div>
               </div>
             )}
           </div>

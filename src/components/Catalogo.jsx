@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { categories } from '../data/products';
 import { StarIcon, CheckIcon, CloseIcon, EmptyBoxIcon } from './Icons';
+import { getApiEndpoints } from '../config/apiConfig';
 
 export const Catalogo = ({
   products,
@@ -19,8 +20,9 @@ export const Catalogo = ({
   const [productCreating, setProductCreating] = useState(false);
   const [productCreateMessage, setProductCreateMessage] = useState(null);
 
-  const API_URL = 'https://op6erfwwmh.execute-api.us-east-1.amazonaws.com/v1/api/status';
-  const API_PRODUCTOS_URL = 'https://op6erfwwmh.execute-api.us-east-1.amazonaws.com/v1/api/productos';
+  const endpoints = getApiEndpoints();
+  const API_URL = endpoints.catalogoStatus;
+  const API_PRODUCTOS_URL = endpoints.catalogoProductos;
 
   const getToken = async () => {
     if (accounts.length === 0) return null;

@@ -19,7 +19,23 @@ function App() {
   } catch (e) {
     // Si MSAL no está disponible
   }
-  const activeAccount = accounts[0];
+  const [customAccount, setCustomAccount] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pedidos360_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const activeAccount = customAccount || accounts[0];
+
+  const handleLoginSuccess = (account) => {
+    setCustomAccount(account);
+    try {
+      localStorage.setItem('pedidos360_user', JSON.stringify(account));
+    } catch {}
+  };
 
   const [products] = useState(initialProducts);
   const [selectedCategory, setSelectedCategory] = useState('Todos');
@@ -40,9 +56,15 @@ function App() {
   const [showArchDetails, setShowArchDetails] = useState(false);
 
   const handleLogout = () => {
-    instance.logoutPopup().catch((e) => {
-      console.error("Error al cerrar sesión:", e);
-    });
+    setCustomAccount(null);
+    try {
+      localStorage.removeItem('pedidos360_user');
+    } catch {}
+    if (instance && typeof instance.logoutPopup === 'function') {
+      instance.logoutPopup().catch((e) => {
+        console.error("Error al cerrar sesión:", e);
+      });
+    }
   };
 
   const handleAddToCart = (product) => {
@@ -176,7 +198,7 @@ function App() {
                 </button>
               </div>
             ) : (
-              <LoginButton />
+              <LoginButton onLoginSuccess={handleLoginSuccess} />
             )}
           </div>
         </div>

@@ -1,41 +1,49 @@
 /**
- * Configuración centralizada de Endpoints Multi-Nube (AWS API Gateway & Localhost)
+ * Configuración centralizada de Endpoints Multi-Nube (AWS API Gateway & Directo EC2 / Localhost)
  */
 
 export const AWS_API_GATEWAY_URL = 'https://op6erfwwmh.execute-api.us-east-1.amazonaws.com/v1';
 
-// Detectar si está en localhost o en la nube
-const isLocalhost = typeof window !== 'undefined' && 
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+// Detectar hostname actual (localhost o IP de EC2)
+const getBaseHost = () => {
+  if (typeof window !== 'undefined' && window.location.hostname) {
+    return window.location.hostname;
+  }
+  return 'localhost';
+};
 
 export const getApiEndpoints = (targetMode = null) => {
+  const host = getBaseHost();
   const savedMode = typeof localStorage !== 'undefined' ? localStorage.getItem('pedidos360_api_mode') : null;
-  const mode = targetMode || savedMode || (isLocalhost ? 'local' : 'cloud');
+  const isLocal = host === 'localhost' || host === '127.0.0.1';
+  
+  // Por defecto usa 'cloud' (API Gateway) para evaluación o 'direct'
+  const mode = targetMode || savedMode || (isLocal ? 'local' : 'cloud');
 
-  if (mode === 'local') {
+  if (mode === 'direct' || mode === 'local') {
     return {
-      mode: 'local',
-      label: 'Localhost (Docker / Spring Boot Directo)',
-      catalogoStatus: 'http://localhost:8080/api/status',
-      catalogoProductos: 'http://localhost:8080/api/productos',
-      carritoStatus: 'http://localhost:8081/api/carrito/status',
-      carritoPedidos: 'http://localhost:8081/api/carrito/pedidos',
-      notificacionesStatus: 'http://localhost:8082/api/notificaciones/status',
-      notificacionesEnviar: 'http://localhost:8082/api/notificaciones/enviar',
-      auditoriaStatus: 'http://localhost:8083/api/auditoria/status',
-      auditoriaEventos: 'http://localhost:8083/api/auditoria',
-      auditoriaStats: 'http://localhost:8083/api/auditoria/stats',
-      adminQueues: 'http://localhost:8084/api/admin/queues',
-      adminExchanges: 'http://localhost:8084/api/admin/exchanges',
-      adminBindings: 'http://localhost:8084/api/admin/bindings',
+      mode: 'direct',
+      label: `Servidores Directos (http://${host}:8080..8084)`,
+      catalogoStatus: `http://${host}:8080/api/status`,
+      catalogoProductos: `http://${host}:8080/api/productos`,
+      carritoStatus: `http://${host}:8081/api/carrito/status`,
+      carritoPedidos: `http://${host}:8081/api/carrito/pedidos`,
+      notificacionesStatus: `http://${host}:8082/api/notificaciones/status`,
+      notificacionesEnviar: `http://${host}:8082/api/notificaciones/enviar`,
+      auditoriaStatus: `http://${host}:8083/api/auditoria/status`,
+      auditoriaEventos: `http://${host}:8083/api/auditoria`,
+      auditoriaStats: `http://${host}:8083/api/auditoria/stats`,
+      adminQueues: `http://${host}:8084/api/admin/queues`,
+      adminExchanges: `http://${host}:8084/api/admin/exchanges`,
+      adminBindings: `http://${host}:8084/api/admin/bindings`,
     };
   }
 
-  // Cloud Mode: AWS HTTP API Gateway
+  // Cloud Mode: AWS HTTP API Gateway (Punto de entrada único)
   return {
     mode: 'cloud',
     label: 'AWS HTTP API Gateway (Perímetro Cloud)',
-    catalogoStatus: `${AWS_API_GATEWAY_URL}/api/status`,
+    catalogoStatus: `${AWS_API_GATEWAY_URL}/api/productos`,
     catalogoProductos: `${AWS_API_GATEWAY_URL}/api/productos`,
     carritoStatus: `${AWS_API_GATEWAY_URL}/api/carrito/status`,
     carritoPedidos: `${AWS_API_GATEWAY_URL}/api/carrito/pedidos`,

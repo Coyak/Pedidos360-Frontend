@@ -195,7 +195,8 @@ export const CloudConsoleModal = ({ isOpen, onClose }) => {
     for (const s of services) {
       try {
         const res = await fetch(s.url);
-        results[s.key] = res.ok ? 'ONLINE' : 'ERROR';
+        // Si responde 200 OK o 401 Unauthorized (perímetro seguro activo con JWT), está ONLINE
+        results[s.key] = (res.ok || res.status === 401 || res.status === 200) ? 'ONLINE' : 'ERROR';
       } catch {
         results[s.key] = 'OFFLINE';
       }
@@ -228,14 +229,14 @@ export const CloudConsoleModal = ({ isOpen, onClose }) => {
                 onClick={() => handleToggleMode('cloud')}
                 title="Conectar a través de AWS API Gateway"
               >
-                ☁️ Cloud AWS
+                ☁️ Cloud AWS (Gateway)
               </button>
               <button 
-                className={`btn-env ${endpoints.mode === 'local' ? 'active' : ''}`}
-                onClick={() => handleToggleMode('local')}
-                title="Conectar directo a puertos locales (Docker/Spring Boot)"
+                className={`btn-env ${endpoints.mode === 'direct' || endpoints.mode === 'local' ? 'active' : ''}`}
+                onClick={() => handleToggleMode('direct')}
+                title="Conectar directo a los puertos de los microservicios (:8080..:8084)"
               >
-                💻 Localhost
+                ⚡ Servidores Directos
               </button>
             </div>
             <button className="modal-close-btn" onClick={onClose} aria-label="Cerrar">

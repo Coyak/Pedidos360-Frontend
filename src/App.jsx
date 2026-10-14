@@ -10,7 +10,15 @@ import { SearchIcon, CartIcon, CloseIcon, CloudIcon, ShieldCheckIcon, QueueIcon 
 import './App.css';
 
 function App() {
-  const { instance, accounts } = useMsal();
+  let instance = null;
+  let accounts = [];
+  try {
+    const msal = useMsal();
+    instance = msal?.instance;
+    accounts = msal?.accounts || [];
+  } catch (e) {
+    // Si MSAL no está disponible
+  }
   const activeAccount = accounts[0];
 
   const [products] = useState(initialProducts);
@@ -150,7 +158,7 @@ function App() {
           </button>
 
           <div className="auth-section">
-            <AuthenticatedTemplate>
+            {activeAccount ? (
               <div className="user-profile-menu">
                 <div className="user-avatar">
                   {activeAccount?.name ? activeAccount.name.charAt(0).toUpperCase() : 'U'}
@@ -167,11 +175,9 @@ function App() {
                   Salir
                 </button>
               </div>
-            </AuthenticatedTemplate>
-
-            <UnauthenticatedTemplate>
+            ) : (
               <LoginButton />
-            </UnauthenticatedTemplate>
+            )}
           </div>
         </div>
       </header>

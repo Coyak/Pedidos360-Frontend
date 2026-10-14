@@ -6,9 +6,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Pedidos360 Store: Plataforma e-commerce moderna conectada a microservicios en AWS y autenticada con Microsoft Entra ID (Azure AD)." />
     <title>Pedidos360 Store • Cloud Native E-Commerce (AWS + Azure)</title>
+    <script>
+      // Polyfill de seguridad para que la aplicación cargue en cualquier contexto
+      window.addEventListener('error', function(e) {
+        console.error('Captured Global Error:', e);
+      });
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #0f172a; color: white; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <div style="text-align: center;">
+          <div style="width: 44px; height: 44px; border: 3px solid rgba(56, 189, 248, 0.2); border-top-color: #38bdf8; border-radius: 50%; margin: 0 auto 16px auto; animation: spin 0.8s linear infinite;"></div>
+          <h3 style="font-size: 1.1rem; font-weight: 600; color: #f8fafc; margin-bottom: 6px;">Cargando Pedidos360 Store...</h3>
+          <p style="font-size: 0.85rem; color: #94a3b8;">Conectando con microservicios en la nube</p>
+        </div>
+      </div>
+      <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

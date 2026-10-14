@@ -6,14 +6,17 @@ import { msalConfig } from './authConfig';
 import App from './App';
 import './index.css';
 
-// Inicializar la instancia principal de MSAL con la configuración declarada
-const msalInstance = new PublicClientApplication(msalConfig);
-
 const root = ReactDOM.createRoot(document.getElementById('root'));
 
-// MSAL Browser v3 requiere invocar initialize() antes de renderizar la app
-msalInstance.initialize()
-  .then(() => {
+let msalInstance = null;
+try {
+  msalInstance = new PublicClientApplication(msalConfig);
+} catch (error) {
+  console.warn("MSAL no pudo crearse directamente (contexto no seguro o sin crypto):", error);
+}
+
+const renderApplication = () => {
+  if (msalInstance) {
     root.render(
       <React.StrictMode>
         <MsalProvider instance={msalInstance}>
@@ -21,15 +24,23 @@ msalInstance.initialize()
         </MsalProvider>
       </React.StrictMode>
     );
-  })
-  .catch((error) => {
-    console.warn("Advertencia en inicialización de MSAL (contexto HTTP/IP):", error);
-    // Renderizado seguro ante advertencias para que la aplicación nunca quede en pantalla blanca
+  } else {
+    // Si MSAL falla al instanciar, renderiza la app de todos modos sin pantalla blanca
     root.render(
       <React.StrictMode>
-        <MsalProvider instance={msalInstance}>
-          <App />
-        </MsalProvider>
+        <App />
       </React.StrictMode>
     );
-  });
+  }
+};
+
+if (msalInstance && typeof msalInstance.initialize === 'function') {
+  msalInstance.initialize()
+    .then(renderApplication)
+    .catch((err) => {
+      console.warn("Advertencia en msalInstance.initialize():", err);
+      renderApplication();
+    });
+} else {
+  renderApplication();
+}

@@ -18,19 +18,26 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+  const [useTrailingSlash, setUseTrailingSlash] = useState(false);
 
   if (!isOpen) return null;
 
   const TENANT_ID = "e5372bf0-c5e3-4286-887c-79069f209c1f";
   const CLIENT_ID = "5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4";
-  const REDIRECT_URI = typeof window !== 'undefined' ? `${window.location.origin}/` : "http://localhost:5173/";
+  const baseOrigin = typeof window !== 'undefined' ? window.location.origin : "http://localhost:5173";
+  const REDIRECT_URI = useTrailingSlash ? `${baseOrigin}/` : baseOrigin;
+
+  const currentRequest = {
+    ...loginRequest,
+    redirectUri: REDIRECT_URI,
+  };
 
   const handleAzurePopupLogin = async () => {
     setLoading(true);
     setErrorMessage(null);
     if (instance && typeof instance.loginPopup === 'function') {
       try {
-        const response = await instance.loginPopup(loginRequest);
+        const response = await instance.loginPopup(currentRequest);
         if (response && response.account) {
           if (onLoginSuccess) onLoginSuccess(response.account);
           onClose();
@@ -38,13 +45,13 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
       } catch (err) {
         console.warn("Aviso Azure Popup:", err);
         setErrorMessage(
-          "El popup fue bloqueado por tu navegador o requiere HTTPS. Usa el botón 'Redirección Oficial de Microsoft' para abrir directamente la página de login de Microsoft."
+          err.message || "El popup fue bloqueado por tu navegador. Usa el botón 'Redirección Oficial de Microsoft'."
         );
       } finally {
         setLoading(false);
       }
     } else {
-      handleAzureRedirectLogin();
+      directMicrosoftOAuthRedirect();
     }
   };
 
@@ -52,10 +59,9 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
     setLoading(true);
     setErrorMessage(null);
 
-    // Intentar primero vía MSAL redirect si la instancia está disponible
     if (instance && typeof instance.loginRedirect === 'function') {
-      instance.loginRedirect(loginRequest).catch((err) => {
-        console.warn("MSAL redirect advertencia, usando endpoint OIDC directo:", err);
+      instance.loginRedirect(currentRequest).catch((err) => {
+        console.warn("MSAL redirect falló, usando endpoint OIDC directo:", err);
         directMicrosoftOAuthRedirect();
       });
     } else {
@@ -118,7 +124,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
               title="Redirige directamente al portal oficial de login de Microsoft"
             >
               <MicrosoftIcon size={20} />
-              <span>{loading ? "Redirigiendo a login.microsoftonline.com..." : "Iniciar Sesión con Microsoft (Redirección Oficial)"}</span>
+              <span>{loading ? "Redirigiendo a Microsoft..." : "Iniciar Sesión con Microsoft (Redirección)"}</span>
             </button>
 
             <button
@@ -127,8 +133,44 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
               disabled={loading}
               title="Abre ventana emergente de Microsoft"
             >
-              <span>Abrir en Ventana Emergente (Popup MSAL)</span>
+              <span>Iniciar con Ventana Emergente (Popup)</span>
             </button>
+          </div>
+
+          {/* Selector de formato de URI para solucionar AADSTS50011 */}
+          <div style={{ background: '#090e17', padding: '0.85rem', borderRadius: '8px', border: '1px solid #1e293b' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+              <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>URI de Redirección enviada:</span>
+              <button
+                type="button"
+                style={{
+                  background: 'rgba(56, 189, 248, 0.15)',
+                  border: '1px solid #38bdf8',
+                  color: '#38bdf8',
+                  borderRadius: '4px',
+                  padding: '0.2rem 0.5rem',
+                  fontSize: '0.72rem',
+                  cursor: 'pointer'
+                }}
+                onClick={() => setUseTrailingSlash(!useTrailingSlash)}
+                title="Alternar entre URI con barra final o sin barra final"
+              >
+                Alternar a: {useTrailingSlash ? 'Sin Barra Final' : 'Con Barra Final (/)'}
+              </button>
+            </div>
+            <code style={{ color: '#38bdf8', fontSize: '0.85rem' }}>{REDIRECT_URI}</code>
+          </div>
+
+          {/* Guía rápida para resolver AADSTS50011 */}
+          <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: '8px', padding: '0.75rem', fontSize: '0.78rem', color: '#cbd5e1', lineHeight: '1.4' }}>
+            <strong style={{ color: '#fbbf24' }}>💡 Si Azure muestra AADSTS50011:</strong>
+            <p style={{ margin: '0.3rem 0 0 0' }}>
+              En <strong>portal.azure.com</strong> &rarr; <em>Microsoft Entra ID</em> &rarr; <em>Registros de aplicaciones</em> &rarr; <em>Pedidos360</em> &rarr; <strong>Autenticación</strong>, agrega ambas URIs en <em>Single-page application (SPA)</em>:
+            </p>
+            <ul style={{ margin: '0.3rem 0 0 1.2rem', padding: 0 }}>
+              <li><code>http://100.26.45.41</code></li>
+              <li><code>http://100.26.45.41/</code></li>
+            </ul>
           </div>
 
           {/* Información Técnica de Rúbrica */}
@@ -140,10 +182,6 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
             <div className="tech-info-row">
               <span>Azure Client ID:</span>
               <code>{CLIENT_ID}</code>
-            </div>
-            <div className="tech-info-row">
-              <span>Redirect URI Autorizada:</span>
-              <code>{REDIRECT_URI}</code>
             </div>
             <div className="tech-info-row">
               <span>Audiencia del Token:</span>

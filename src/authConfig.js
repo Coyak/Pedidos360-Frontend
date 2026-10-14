@@ -8,13 +8,13 @@ export const msalConfig = {
   auth: {
     clientId: "5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4", 
     authority: "https://login.microsoftonline.com/e5372bf0-c5e3-4286-887c-79069f209c1f", // Tenant ID de Pedidos360
-    redirectUri: typeof window !== 'undefined' ? (window.location.origin + window.location.pathname).replace(/\/$/, '') || window.location.origin : "http://localhost:5173",
-    postLogoutRedirectUri: typeof window !== 'undefined' ? window.location.origin : "http://localhost:5173",
+    redirectUri: typeof window !== 'undefined' ? (window.location.origin + window.location.pathname) : "http://localhost:5173",
+    postLogoutRedirectUri: typeof window !== 'undefined' ? (window.location.origin + window.location.pathname) : "http://localhost:5173",
     navigateToLoginRequestUrl: true,
   },
   cache: {
-    cacheLocation: "localStorage", // Guarda sesión para persistir recargas de página
-    storeAuthStateInCookie: true,
+    cacheLocation: "sessionStorage",
+    storeAuthStateInCookie: false,
   },
   system: {
     loggerOptions: {
@@ -29,10 +29,10 @@ export const msalConfig = {
 };
 
 /**
- * Scopes estándar OpenID Connect para inicio de sesión en Azure Entra ID
+ * Scopes estándar requeridos para inicio de sesión en Azure Entra ID (guía docente)
  */
 export const loginRequest = {
-  scopes: ["openid", "profile", "email"],
+  scopes: ["User.Read", "openid", "profile", "email"],
 };
 
 /**

@@ -44,7 +44,7 @@ export const OrderSuccessModal = ({ orderData, onClose }) => {
             </div>
             <div className="receipt-row">
               <span className="receipt-label">Cliente (Entra ID):</span>
-              <span className="receipt-value">{payload?.clienteEmail || 'usuario@duocuc.cl'}</span>
+              <span className="receipt-value">{payload?.clienteEmail || 'cliente@pedidos360.com'}</span>
             </div>
             <div className="receipt-row">
               <span className="receipt-label">Dirección de Entrega:</span>

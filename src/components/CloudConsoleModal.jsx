@@ -30,7 +30,7 @@ export const CloudConsoleModal = ({ isOpen, onClose }) => {
   const [auditLoading, setAuditLoading] = useState(false);
 
   // Estados para Notificaciones
-  const [notifyEmail, setNotifyEmail] = useState(accounts[0]?.username || 'estudiante@duocuc.cl');
+  const [notifyEmail, setNotifyEmail] = useState(accounts[0]?.username || 'admin@pedidos360.com');
   const [notifySubject, setNotifySubject] = useState('Confirmación de Despacho Pedidos360');
   const [notifyMessage, setNotifyMessage] = useState('Tu orden ha sido encolada y procesada exitosamente en AWS EC2.');
   const [notifyResult, setNotifyResult] = useState(null);
@@ -721,6 +721,43 @@ export const CloudConsoleModal = ({ isOpen, onClose }) => {
                 <div className="key-row">
                   <span>AWS Gateway Endpoint:</span>
                   <code>op6erfwwmh.execute-api.us-east-1.amazonaws.com</code>
+                </div>
+              </div>
+
+              {/* Flujo de Integración Multi-Cloud (Rúbrica EP4) */}
+              <div style={{ marginTop: '1.2rem' }}>
+                <h5 className="sub-title">Diagrama de Flujo e Integración Multi-Cloud (Azure + AWS + RabbitMQ):</h5>
+                <div className="arch-steps-grid">
+                  <div className="arch-step-card">
+                    <span className="step-num">1</span>
+                    <h4>Azure AD (IDaaS)</h4>
+                    <p>Autenticación OAuth2/OIDC con PKCE. Emite JWT firmado para el usuario institucional.</p>
+                  </div>
+                  <div className="arch-step-card">
+                    <span className="step-num">2</span>
+                    <h4>AWS API Gateway</h4>
+                    <p>Perímetro de red con JWT Authorizer. Valida la firma del token y rechaza 401 sin credenciales.</p>
+                  </div>
+                  <div className="arch-step-card">
+                    <span className="step-num">3</span>
+                    <h4>Microservicio Carrito (:8081)</h4>
+                    <p>Recibe la orden y publica el evento <code>pedidos.pedido.creado</code> en RabbitMQ.</p>
+                  </div>
+                  <div className="arch-step-card">
+                    <span className="step-num">4</span>
+                    <h4>Clúster RabbitMQ (2 Nodos)</h4>
+                    <p>TopicExchange enruta a 3 colas de dominio con sus 3 DLQs vía DirectExchange.</p>
+                  </div>
+                  <div className="arch-step-card">
+                    <span className="step-num">5</span>
+                    <h4>Catálogo & Notificaciones</h4>
+                    <p>Descuento de stock en vivo y envío de correo transaccional con confirmación manual (ACK).</p>
+                  </div>
+                  <div className="arch-step-card">
+                    <span className="step-num">6</span>
+                    <h4>Auditoría SHA-256 (:8083)</h4>
+                    <p>Sella cada transacción con hash criptográfico SHA-256 para no repudio y trazabilidad.</p>
+                  </div>
                 </div>
               </div>
             </div>

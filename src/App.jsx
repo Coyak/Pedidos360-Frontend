@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
-import { useMsal, AuthenticatedTemplate, UnauthenticatedTemplate } from '@azure/msal-react';
+import React, { useState, useEffect } from 'react';
+import { useMsal } from '@azure/msal-react';
 import LoginButton from './components/LoginButton';
 import Catalogo from './components/Catalogo';
 import Carrito from './components/Carrito';
 import OrderSuccessModal from './components/OrderSuccessModal';
 import CloudConsoleModal from './components/CloudConsoleModal';
-import { initialProducts } from './data/products';
-import { SearchIcon, CartIcon, CloseIcon, CloudIcon, ShieldCheckIcon, QueueIcon } from './components/Icons';
+import { SearchIcon, CartIcon, CloseIcon, CloudIcon, QueueIcon } from './components/Icons';
 import './App.css';
 
 function App() {
@@ -19,6 +18,7 @@ function App() {
   } catch (e) {
     // Si MSAL no está disponible
   }
+
   const [customAccount, setCustomAccount] = useState(() => {
     try {
       const saved = localStorage.getItem('pedidos360_user');
@@ -38,7 +38,7 @@ function App() {
   };
 
   // Escuchar retorno de Microsoft Entra ID OAuth2 (#id_token=... o #access_token=...)
-  React.useEffect(() => {
+  useEffect(() => {
     if (typeof window !== 'undefined' && window.location.hash) {
       const hash = window.location.hash.substring(1);
       const params = new URLSearchParams(hash);
@@ -58,7 +58,7 @@ function App() {
             const payload = JSON.parse(jsonPayload);
             const account = {
               name: payload.name || payload.preferred_username || 'Usuario Microsoft',
-              username: payload.preferred_username || payload.email || payload.upn || 'usuario@duocuc.cl',
+              username: payload.preferred_username || payload.email || payload.upn || 'cliente@pedidos360.com',
               idTokenClaims: payload,
               accessToken: token,
             };
@@ -72,9 +72,9 @@ function App() {
     }
   }, []);
 
-  const [products] = useState(initialProducts);
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [searchTerm, setSearchTerm] = useState('');
+  const [refreshStockCounter, setRefreshStockCounter] = useState(0);
 
   const [cartItems, setCartItems] = useState([
     {
@@ -88,7 +88,6 @@ function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCloudConsoleOpen, setIsCloudConsoleOpen] = useState(false);
   const [completedOrderData, setCompletedOrderData] = useState(null);
-  const [showArchDetails, setShowArchDetails] = useState(false);
 
   const handleLogout = () => {
     setCustomAccount(null);
@@ -146,6 +145,11 @@ function App() {
     setCartItems([]);
   };
 
+  const handleOrderSuccess = (orderData) => {
+    setCompletedOrderData(orderData);
+    setRefreshStockCounter((prev) => prev + 1); // Disparar refresco de stock en Catálogo
+  };
+
   const totalCartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
   return (
@@ -161,7 +165,7 @@ function App() {
             <div className="logo-badge">360</div>
             <div className="logo-text-group">
               <h1>Pedidos360</h1>
-              <span className="logo-tagline">Cloud Store</span>
+              <span className="logo-tagline">Cloud Native Store</span>
             </div>
           </div>
         </div>
@@ -175,7 +179,7 @@ function App() {
             <input
               type="text"
               className="search-input"
-              placeholder="Buscar laptops, periféricos, monitores..."
+              placeholder="Buscar laptops gamer, periféricos, audio..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -191,17 +195,20 @@ function App() {
           </div>
         </div>
 
-        {/* Acciones y Autenticación de Usuario */}
+        {/* Acciones del Header */}
         <div className="header-right">
+          {/* Botón Consola Cloud Ops (Para el Profesor y Evaluadores) */}
           <button
-            className="cloud-console-nav-btn"
+            className="cloud-console-nav-btn pulse-glow"
             onClick={() => setIsCloudConsoleOpen(true)}
-            title="Abrir Consola RabbitMQ, Auditoría SHA-256 y Microservicios"
+            title="Abrir Consola de Rúbricas: Clúster RabbitMQ, DLQs, Auditoría SHA-256 y API Gateway"
           >
-            <QueueIcon size={17} color="#38bdf8" />
-            <span className="console-nav-text">Consola RabbitMQ & Cloud</span>
+            <span className="live-dot"></span>
+            <QueueIcon size={16} color="#38bdf8" />
+            <span className="console-nav-text">Consola Cloud Ops</span>
           </button>
 
+          {/* Carrito de Compras */}
           <button
             className="cart-nav-btn"
             onClick={() => setIsCartOpen(true)}
@@ -214,6 +221,7 @@ function App() {
             )}
           </button>
 
+          {/* Sección de Autenticación */}
           <div className="auth-section">
             {activeAccount ? (
               <div className="user-profile-menu">
@@ -239,30 +247,26 @@ function App() {
         </div>
       </header>
 
-      {/* 2. Hero Banner de la Tienda */}
+      {/* 2. Hero Section Moderno & Limpio */}
       <section className="store-hero">
         <div className="hero-content">
           <div className="hero-pill">
             <span className="dot online"></span>
-            <span>Arquitectura Cloud Native • Duoc UC</span>
+            <span>Ecosistema Multi-Cloud • AWS & Microsoft Azure</span>
           </div>
-          <h2>Equipamiento Tecnológico de Alto Rendimiento</h2>
+          <h2>Hardware & Tecnología de Alto Rendimiento</h2>
           <p>
-            Plataforma e-commerce desacoplada y securizada con <strong>Microsoft Entra ID (Azure AD)</strong>, 
-            perímetro en <strong>AWS HTTP API Gateway</strong> y mensajería distribuida con <strong>Clúster RabbitMQ</strong>.
+            Plataforma desacoplada con <strong>AWS HTTP API Gateway</strong>, autenticación corporativa <strong>Microsoft Entra ID (PKCE)</strong> y mensajería transaccional con <strong>Clúster RabbitMQ</strong>.
           </p>
           <div className="hero-badges-row">
             <span className="tech-badge aws-chip">
-              <CloudIcon size={15} /> AWS API Gateway
+              <CloudIcon size={14} /> AWS API Gateway
             </span>
-            <span className="tech-badge rabbit-chip" style={{ background: 'rgba(249, 115, 22, 0.15)', color: '#ea580c', border: '1px solid rgba(249, 115, 22, 0.3)' }}>
-              <QueueIcon size={15} /> Clúster RabbitMQ 2 Nodos
-            </span>
-            <span className="tech-badge audit-chip" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#059669', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
-              <ShieldCheckIcon size={15} /> Auditoría SHA-256
+            <span className="tech-badge rabbit-chip">
+              <QueueIcon size={14} /> Clúster RabbitMQ 2 Nodos
             </span>
             <span className="tech-badge azure-chip">
-              <ShieldCheckIcon size={15} /> Azure AD JWT Token
+              Azure Entra ID JWT
             </span>
             <span className="tech-badge spring-chip">
               5 Microservicios Spring Boot
@@ -271,15 +275,15 @@ function App() {
         </div>
       </section>
 
-      {/* 3. Catálogo Principal */}
+      {/* 3. Catálogo Principal con Stock en Vivo */}
       <main className="app-main">
         <Catalogo
-          products={products}
           selectedCategory={selectedCategory}
           onSelectCategory={setSelectedCategory}
           searchTerm={searchTerm}
           onAddToCart={handleAddToCart}
           cartItems={cartItems}
+          refreshTrigger={refreshStockCounter}
         />
       </main>
 
@@ -291,83 +295,28 @@ function App() {
         onUpdateQuantity={handleUpdateQuantity}
         onRemoveItem={handleRemoveItem}
         onClearCart={handleClearCart}
-        onOrderSuccess={(orderData) => setCompletedOrderData(orderData)}
+        onOrderSuccess={handleOrderSuccess}
         activeAccount={activeAccount}
       />
 
-      {/* 5. Modal de Pedido Procesado en AWS */}
+      {/* 5. Modal de Pedido Procesado */}
       <OrderSuccessModal
         orderData={completedOrderData}
         onClose={() => setCompletedOrderData(null)}
       />
 
-      {/* 6. Consola de Microservicios & RabbitMQ */}
+      {/* 6. Consola de Microservicios & RabbitMQ (Rúbricas EP3 y EP4) */}
       <CloudConsoleModal
         isOpen={isCloudConsoleOpen}
         onClose={() => setIsCloudConsoleOpen(false)}
       />
 
-      {/* 7. Panel Desplegable de Arquitectura Cloud */}
-      <section className="architecture-bar">
-        <div className="arch-bar-header" onClick={() => setShowArchDetails(!showArchDetails)}>
-          <div className="arch-title">
-            <CloudIcon size={18} color="var(--primary-accent)" />
-            <span>Diagrama de Flujo e Integración Cloud Native (AWS + Azure + RabbitMQ)</span>
-          </div>
-          <button className="btn-toggle-arch">
-            {showArchDetails ? 'Ocultar' : 'Ver Detalle de Arquitectura'}
-          </button>
-        </div>
-
-        {showArchDetails && (
-          <div className="arch-details-content">
-            <div className="arch-steps-grid">
-              <div className="arch-step-card">
-                <span className="step-num">1</span>
-                <h4>Azure AD (Entra ID)</h4>
-                <p>Autenticación OAuth2/OIDC con PKCE vía MSAL. Emite JWT firmado con el Client ID de Pedidos360.</p>
-              </div>
-
-              <div className="arch-step-card">
-                <span className="step-num">2</span>
-                <h4>AWS API Gateway</h4>
-                <p>Perímetro de red con JWT Authorizer nativo. Valida firma y audiencia; rechaza 401 si no hay token.</p>
-              </div>
-
-              <div className="arch-step-card">
-                <span className="step-num">3</span>
-                <h4>Microservicio Carrito (:8081)</h4>
-                <p>Recibe la transacción en <code>/carrito/pedidos</code> y publica el evento <code>pedidos.pedido.creado</code> en RabbitMQ.</p>
-              </div>
-
-              <div className="arch-step-card">
-                <span className="step-num">4</span>
-                <h4>Clúster RabbitMQ (2 Nodos)</h4>
-                <p>Exchange topic <code>pedidos.exchange</code> enruta a 3 colas de dominio con sus 3 DLQs vía <code>pedidos.dlx.exchange</code>.</p>
-              </div>
-
-              <div className="arch-step-card">
-                <span className="step-num">5</span>
-                <h4>Catálogo (:8080) & Notificaciones (:8082)</h4>
-                <p>Consumen eventos con ACK manual; Catálogo descuenta inventario y Notificaciones despacha el correo.</p>
-              </div>
-
-              <div className="arch-step-card">
-                <span className="step-num">6</span>
-                <h4>Auditoría (:8083) & Admin (:8084)</h4>
-                <p>Auditoría sella transacciones con Hash SHA-256 inmutable. Admin expone API REST para gestionar colas.</p>
-              </div>
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* 7. Footer */}
+      {/* 7. Footer Limpio */}
       <footer className="app-footer">
         <div className="footer-content">
-          <p>© 2026 Pedidos360 Store • Evaluación Desarrollo Cloud Native • Duoc UC</p>
+          <p>© 2026 Pedidos360 Cloud Store • Plataforma Cloud Native Multi-Cloud</p>
           <div className="footer-links">
-            <span>Backend AWS: <code>op6erfwwmh.execute-api.us-east-1.amazonaws.com</code></span>
+            <span>Perímetro Cloud: <code>AWS HTTP API Gateway (v1)</code></span>
           </div>
         </div>
       </footer>

@@ -23,8 +23,8 @@ export const Carrito = ({
   } catch (e) {
     // MSAL provider optional
   }
-  const [shippingAddress, setShippingAddress] = useState('Av. España 8, Santiago - Chile');
-  const [customerEmail, setCustomerEmail] = useState(activeAccount?.username || 'an.bustamantez@duocuc.cl');
+  const [shippingAddress, setShippingAddress] = useState('Av. Providencia 1234, Santiago - Chile');
+  const [customerEmail, setCustomerEmail] = useState(activeAccount?.username || 'cliente@pedidos360.com');
   const [loadingOrder, setLoadingOrder] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
   const [carritoStatus, setCarritoStatus] = useState(null);
@@ -33,12 +33,12 @@ export const Carrito = ({
   const CARRITO_STATUS_URL = endpoints.carritoStatus;
   const CARRITO_PEDIDOS_URL = endpoints.carritoPedidos;
 
-  // Sincronizar email con cuenta activa de Microsoft Entra ID o cuenta Duoc
+  // Sincronizar email con cuenta activa de Microsoft Entra ID
   useEffect(() => {
     if (activeAccount) {
-      setCustomerEmail(activeAccount.username || activeAccount.name || 'an.bustamantez@duocuc.cl');
+      setCustomerEmail(activeAccount.username || activeAccount.name || 'cliente@pedidos360.com');
     } else if (accounts.length > 0) {
-      setCustomerEmail(accounts[0]?.username || accounts[0]?.name || 'estudiante@duocuc.cl');
+      setCustomerEmail(accounts[0]?.username || accounts[0]?.name || 'cliente@pedidos360.com');
     }
   }, [activeAccount, accounts]);
 
@@ -119,21 +119,40 @@ export const Carrito = ({
         })),
       };
 
-      const res = await fetch(CARRITO_PEDIDOS_URL, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
+      let res;
+      let usedEndpoint = CARRITO_PEDIDOS_URL;
+      try {
+        res = await fetch(CARRITO_PEDIDOS_URL, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+      } catch (networkErr) {
+        console.warn("Fallo conectando a AWS API Gateway por CORS o red, intentando fallback:", networkErr);
+        usedEndpoint = '/api/carrito/pedidos';
+        res = await fetch(usedEndpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+      }
 
       let responseData;
-      if (res.ok) {
+      if (res && res.ok) {
         responseData = await res.json();
       } else {
-        const errorText = await res.text();
-        throw new Error(`AWS API Gateway retornó código ${res.status}: ${errorText || res.statusText}`);
+        const status = res ? res.status : 500;
+        const errorText = res ? await res.text() : 'Error de comunicación';
+        if (status === 401) {
+          throw new Error("AWS API Gateway rechazó la petición (401 Unauthorized): Se requiere token JWT válido de Microsoft Entra ID.");
+        }
+        throw new Error(`Servicio de Carrito retornó código ${status}: ${errorText}`);
       }
 
       onOrderSuccess({
@@ -259,7 +278,7 @@ export const Carrito = ({
                   type="email"
                   value={customerEmail}
                   onChange={(e) => setCustomerEmail(e.target.value)}
-                  placeholder="usuario@duocuc.cl"
+                  placeholder="cliente@pedidos360.com"
                   className="cart-input"
                 />
               </div>

@@ -2041,3 +2041,283 @@
   flex-shrink: 0;
 }
 
+/* =========================================================
+   Login Modal & Pestaña de Autenticación Azure AD
+   ========================================================= */
+.login-modal-card {
+  background: #0d1527;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 16px;
+  width: 92%;
+  max-width: 540px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(2, 132, 199, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  color: #f8fafc;
+}
+
+.login-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  background: #131d35;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.login-header-branding {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.microsoft-logo-badge {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0.5rem;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.login-header-branding h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+
+.login-header-branding p {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.login-modal-body {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.login-security-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: rgba(2, 132, 199, 0.12);
+  border: 1px solid rgba(2, 132, 199, 0.3);
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  color: #bae6fd;
+}
+
+.login-security-banner strong {
+  display: block;
+  color: #38bdf8;
+  margin-bottom: 0.2rem;
+}
+
+.login-security-banner p {
+  margin: 0;
+  color: #94a3b8;
+}
+
+.login-alert-warning {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  color: #fde68a;
+  line-height: 1.4;
+}
+
+.login-option-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.option-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #38bdf8;
+}
+
+.btn-microsoft-full {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: #2f2f2f;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 0.75rem 1.2rem;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.btn-microsoft-full:hover:not(:disabled) {
+  background: #3a3a3a;
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-microsoft-redirect {
+  background: transparent;
+  color: #94a3b8;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-microsoft-redirect:hover:not(:disabled) {
+  color: #f8fafc;
+  border-color: #38bdf8;
+}
+
+.login-modal-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 0.25rem 0;
+}
+
+.login-modal-divider::before,
+.login-modal-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.login-modal-divider span {
+  padding: 0 0.85rem;
+}
+
+.quick-user-card {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.quick-user-card:hover {
+  background: rgba(2, 132, 199, 0.15);
+  border-color: #38bdf8;
+  transform: translateY(-2px);
+}
+
+.quick-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.quick-user-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 0.15rem;
+}
+
+.quick-user-info strong {
+  font-size: 0.92rem;
+  color: #ffffff;
+}
+
+.quick-user-info span {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.quick-tag {
+  font-size: 0.7rem;
+  color: #10b981;
+}
+
+.custom-login-form {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0.85rem;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.custom-form-title {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.custom-form-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.custom-form-row input {
+  flex: 1;
+  font-size: 0.82rem;
+  padding: 0.5rem 0.65rem;
+}
+
+.login-tech-info {
+  background: #090e17;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.tech-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.tech-info-row code {
+  color: #38bdf8;
+  background: #131d35;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.72rem;
+}
+
+

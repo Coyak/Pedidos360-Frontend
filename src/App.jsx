@@ -257,6 +257,7 @@ function App() {
         onRemoveItem={handleRemoveItem}
         onClearCart={handleClearCart}
         onOrderSuccess={(orderData) => setCompletedOrderData(orderData)}
+        activeAccount={activeAccount}
       />
 
       {/* 5. Modal de Pedido Procesado en AWS */}

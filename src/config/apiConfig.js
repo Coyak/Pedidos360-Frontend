@@ -1,11 +1,11 @@
 /**
- * Configuración centralizada de Endpoints Multi-Nube (AWS API Gateway & Directo EC2 / Localhost)
+ * Configuración centralizada de Endpoints Multi-Nube (Nginx Proxy, Directo EC2 y AWS API Gateway)
  */
 
 export const AWS_API_GATEWAY_URL = 'https://op6erfwwmh.execute-api.us-east-1.amazonaws.com/v1';
 
-// Detectar hostname actual (localhost o IP de EC2)
-const getBaseHost = () => {
+// Detectar hostname actual (localhost o IP pública de EC2)
+export const getBaseHost = () => {
   if (typeof window !== 'undefined' && window.location.hostname) {
     return window.location.hostname;
   }
@@ -17,8 +17,33 @@ export const getApiEndpoints = (targetMode = null) => {
   const savedMode = typeof localStorage !== 'undefined' ? localStorage.getItem('pedidos360_api_mode') : null;
   const isLocal = host === 'localhost' || host === '127.0.0.1';
   
-  // Por defecto usa 'cloud' (API Gateway) para evaluación o 'direct'
-  const mode = targetMode || savedMode || (isLocal ? 'local' : 'cloud');
+  // Modos disponibles: 'direct' (puertos 8080..8084), 'proxy' (Nginx relativo /api/...), 'cloud' (AWS Gateway)
+  // En producción (puerto 80 o IP pública), 'proxy' o 'direct' garantizan conectividad inmediata sin bloqueos CORS
+  let defaultMode = 'direct';
+  if (typeof window !== 'undefined' && (window.location.port === '80' || window.location.port === '')) {
+    defaultMode = 'proxy';
+  }
+  
+  const mode = targetMode || savedMode || defaultMode;
+
+  if (mode === 'proxy') {
+    return {
+      mode: 'proxy',
+      label: `Proxy Nginx Integrado (/api/*)`,
+      catalogoStatus: `/api/status`,
+      catalogoProductos: `/api/productos`,
+      carritoStatus: `/api/carrito/status`,
+      carritoPedidos: `/api/carrito/pedidos`,
+      notificacionesStatus: `/api/notificaciones/status`,
+      notificacionesEnviar: `/api/notificaciones/enviar`,
+      auditoriaStatus: `/api/auditoria/status`,
+      auditoriaEventos: `/api/auditoria`,
+      auditoriaStats: `/api/auditoria/stats`,
+      adminQueues: `/api/admin/queues`,
+      adminExchanges: `/api/admin/exchanges`,
+      adminBindings: `/api/admin/bindings`,
+    };
+  }
 
   if (mode === 'direct' || mode === 'local') {
     return {

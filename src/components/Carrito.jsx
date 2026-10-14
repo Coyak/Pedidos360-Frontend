@@ -12,10 +12,19 @@ export const Carrito = ({
   onRemoveItem,
   onClearCart,
   onOrderSuccess,
+  activeAccount,
 }) => {
-  const { instance, accounts } = useMsal();
+  let instance = null;
+  let accounts = [];
+  try {
+    const msalData = useMsal();
+    instance = msalData?.instance;
+    accounts = msalData?.accounts || [];
+  } catch (e) {
+    // MSAL provider optional
+  }
   const [shippingAddress, setShippingAddress] = useState('Av. España 8, Santiago - Chile');
-  const [customerEmail, setCustomerEmail] = useState('');
+  const [customerEmail, setCustomerEmail] = useState(activeAccount?.username || 'an.bustamantez@duocuc.cl');
   const [loadingOrder, setLoadingOrder] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
   const [carritoStatus, setCarritoStatus] = useState(null);
@@ -24,14 +33,14 @@ export const Carrito = ({
   const CARRITO_STATUS_URL = endpoints.carritoStatus;
   const CARRITO_PEDIDOS_URL = endpoints.carritoPedidos;
 
-  // Sincronizar email con cuenta activa de Microsoft Entra ID
+  // Sincronizar email con cuenta activa de Microsoft Entra ID o cuenta Duoc
   useEffect(() => {
-    if (accounts.length > 0) {
+    if (activeAccount) {
+      setCustomerEmail(activeAccount.username || activeAccount.name || 'an.bustamantez@duocuc.cl');
+    } else if (accounts.length > 0) {
       setCustomerEmail(accounts[0]?.username || accounts[0]?.name || 'estudiante@duocuc.cl');
-    } else {
-      setCustomerEmail('usuario@duocuc.cl');
     }
-  }, [accounts]);
+  }, [activeAccount, accounts]);
 
   // Verificar estado del microservicio Carrito en AWS
   useEffect(() => {
@@ -72,8 +81,8 @@ export const Carrito = ({
     if (cartItems.length === 0) return;
     setErrorMessage(null);
 
-    // Si el usuario no ha iniciado sesión, intentar login de Azure AD o continuar en modo demo
-    if (accounts.length === 0) {
+    // Si el usuario no ha iniciado sesión, intentar login de Azure AD o continuar con la sesión activa
+    if (!activeAccount && accounts.length === 0 && instance && typeof instance.loginPopup === 'function') {
       try {
         await instance.loginPopup({
           scopes: ["5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4/.default"],
@@ -295,11 +304,11 @@ export const Carrito = ({
               disabled={loadingOrder}
             >
               {loadingOrder ? (
-                <span>Enviando a AWS HTTP API Gateway...</span>
-              ) : accounts.length === 0 ? (
-                <span>Iniciar Sesión con Microsoft para Comprar</span>
+                <span>Enviando a Carrito & Clúster RabbitMQ...</span>
+              ) : (!activeAccount && accounts.length === 0) ? (
+                <span>Iniciar Sesión para Comprar</span>
               ) : (
-                <span>Confirmar y Procesar en AWS (POST 201)</span>
+                <span>Confirmar y Procesar Compra (POST 201)</span>
               )}
             </button>
 

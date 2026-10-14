@@ -46,6 +46,7 @@ export const CloudConsoleModal = ({ isOpen, onClose }) => {
   }, [isOpen]);
 
   const loadInitialData = async () => {
+    fetchQueuesData();
     fetchAuditData();
     checkHealth();
   };
@@ -55,9 +56,25 @@ export const CloudConsoleModal = ({ isOpen, onClose }) => {
     const updated = getApiEndpoints(newMode);
     setEndpoints(updated);
     setTimeout(() => {
+      fetchQueuesData(updated);
       fetchAuditData(updated);
       checkHealth(updated);
     }, 100);
+  };
+
+  // 0. Cargar Colas de RabbitMQ en vivo desde Admin API (:8084)
+  const fetchQueuesData = async (cfg = endpoints) => {
+    try {
+      const res = await fetch(cfg.adminQueues);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setQueuesList(data);
+        }
+      }
+    } catch (e) {
+      console.warn("No se pudieron cargar colas desde Admin API:", e);
+    }
   };
 
   // 1. Cargar Auditoría
@@ -189,6 +206,7 @@ export const CloudConsoleModal = ({ isOpen, onClose }) => {
       { key: 'carrito', url: cfg.carritoStatus, port: '8081' },
       { key: 'notificaciones', url: cfg.notificacionesStatus, port: '8082' },
       { key: 'auditoria', url: cfg.auditoriaStatus, port: '8083' },
+      { key: 'admin', url: cfg.adminQueues, port: '8084' },
     ];
 
     const results = {};
@@ -225,18 +243,25 @@ export const CloudConsoleModal = ({ isOpen, onClose }) => {
             <div className="env-selector">
               <span className="env-label">Modo:</span>
               <button 
-                className={`btn-env ${endpoints.mode === 'cloud' ? 'active' : ''}`}
-                onClick={() => handleToggleMode('cloud')}
-                title="Conectar a través de AWS API Gateway"
+                className={`btn-env ${endpoints.mode === 'proxy' ? 'active' : ''}`}
+                onClick={() => handleToggleMode('proxy')}
+                title="Conectar a través del Proxy Nginx integrado en EC2 (/api/*)"
               >
-                ☁️ Cloud AWS (Gateway)
+                🔄 Proxy EC2
               </button>
               <button 
                 className={`btn-env ${endpoints.mode === 'direct' || endpoints.mode === 'local' ? 'active' : ''}`}
                 onClick={() => handleToggleMode('direct')}
                 title="Conectar directo a los puertos de los microservicios (:8080..:8084)"
               >
-                ⚡ Servidores Directos
+                ⚡ Puertos Directos
+              </button>
+              <button 
+                className={`btn-env ${endpoints.mode === 'cloud' ? 'active' : ''}`}
+                onClick={() => handleToggleMode('cloud')}
+                title="Conectar a través de AWS API Gateway"
+              >
+                ☁️ AWS Gateway
               </button>
             </div>
             <button className="modal-close-btn" onClick={onClose} aria-label="Cerrar">
@@ -360,6 +385,60 @@ export const CloudConsoleModal = ({ isOpen, onClose }) => {
                   </tbody>
                 </table>
               </div>
+
+              {/* Estado en Vivo de Colas desde Admin API */}
+              {queuesList.length > 0 && (
+                <div style={{ marginTop: '1.2rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <h5 className="sub-title" style={{ margin: 0 }}>📊 Colas Activas en Tiempo Real (Admin API :8084):</h5>
+                    <button className="btn btn-secondary btn-sm" onClick={() => fetchQueuesData()}>
+                      <RefreshIcon size={14} /> Refrescar Colas
+                    </button>
+                  </div>
+                  <div className="queues-table-wrapper">
+                    <table className="queues-table">
+                      <thead>
+                        <tr>
+                          <th>Nombre de Cola</th>
+                          <th>Mensajes en Cola</th>
+                          <th>Consumidores Escuchando</th>
+                          <th>Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {queuesList.map((q, idx) => (
+                          <tr key={idx}>
+                            <td><code>{q.nombre}</code></td>
+                            <td>
+                              <span style={{ 
+                                fontWeight: 700, 
+                                color: q.totalMensajes > 0 ? '#f59e0b' : '#10b981' 
+                              }}>
+                                {q.totalMensajes} msgs
+                              </span>
+                            </td>
+                            <td>
+                              <span className="ack-chip">
+                                {q.totalConsumidores} activo(s)
+                              </span>
+                            </td>
+                            <td>
+                              <button
+                                className="btn btn-danger btn-sm"
+                                style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+                                onClick={() => handleDeleteQueue(q.nombre)}
+                                title="Eliminar cola"
+                              >
+                                Eliminar
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               {/* Panel de prueba Admin API */}
               <div className="admin-actions-box">

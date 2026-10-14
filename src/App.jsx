@@ -5,7 +5,8 @@ import Catalogo from './components/Catalogo';
 import Carrito from './components/Carrito';
 import OrderSuccessModal from './components/OrderSuccessModal';
 import CloudConsoleModal from './components/CloudConsoleModal';
-import { SearchIcon, CartIcon, CloseIcon, CloudIcon, QueueIcon } from './components/Icons';
+import MisComprasModal from './components/MisComprasModal';
+import { SearchIcon, CartIcon, CloseIcon, CloudIcon, QueueIcon, ShieldCheckIcon } from './components/Icons';
 import './App.css';
 
 function App() {
@@ -87,6 +88,7 @@ function App() {
   ]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCloudConsoleOpen, setIsCloudConsoleOpen] = useState(false);
+  const [isComprasOpen, setIsComprasOpen] = useState(false);
   const [completedOrderData, setCompletedOrderData] = useState(null);
 
   const handleLogout = () => {
@@ -197,6 +199,16 @@ function App() {
 
         {/* Acciones del Header */}
         <div className="header-right">
+          {/* Botón Mis Compras Recientes (Sellos SHA-256) */}
+          <button
+            className="compras-nav-btn"
+            onClick={() => setIsComprasOpen(true)}
+            title="Ver historial de compras recientes y sellos criptográficos SHA-256"
+          >
+            <ShieldCheckIcon size={16} color="#10b981" />
+            <span className="compras-nav-text">Mis Compras</span>
+          </button>
+
           {/* Botón Consola Cloud Ops (Para el Profesor y Evaluadores) */}
           <button
             className="cloud-console-nav-btn pulse-glow"
@@ -303,6 +315,13 @@ function App() {
       <OrderSuccessModal
         orderData={completedOrderData}
         onClose={() => setCompletedOrderData(null)}
+      />
+
+      {/* 5.1. Modal de Mis Compras Recientes (Auditoría SHA-256) */}
+      <MisComprasModal
+        isOpen={isComprasOpen}
+        onClose={() => setIsComprasOpen(false)}
+        activeAccount={activeAccount}
       />
 
       {/* 6. Consola de Microservicios & RabbitMQ (Rúbricas EP3 y EP4) */}

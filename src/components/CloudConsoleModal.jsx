@@ -507,11 +507,11 @@ export const CloudConsoleModal = ({ isOpen, onClose }) => {
               <div className="audit-stats-cards">
                 <div className="stat-card">
                   <span className="stat-label">Total Eventos Auditados</span>
-                  <strong className="stat-value">{auditStats?.totalEventos || auditLogs.length}</strong>
+                  <strong className="stat-value">{auditStats?.totalPedidosAuditados ?? auditStats?.totalEventos ?? auditLogs.length}</strong>
                 </div>
                 <div className="stat-card">
                   <span className="stat-label">Total Transaccionado</span>
-                  <strong className="stat-value">${Number(auditStats?.montoTotalAuditado || 0).toLocaleString('es-CL')} CLP</strong>
+                  <strong className="stat-value">${Number(auditStats?.totalMontoAuditado ?? auditStats?.montoTotalAuditado ?? 0).toLocaleString('es-CL')} CLP</strong>
                 </div>
                 <div className="stat-card">
                   <span className="stat-label">Algoritmo Criptográfico</span>
@@ -545,20 +545,28 @@ export const CloudConsoleModal = ({ isOpen, onClose }) => {
                       </tr>
                     </thead>
                     <tbody>
-                      {auditLogs.map((log, idx) => (
-                        <tr key={idx}>
-                          <td><strong>{log.idPedido}</strong></td>
-                          <td>{log.clienteEmail}</td>
-                          <td><small>{new Date(log.fechaCreacion || log.timestamp).toLocaleString('es-CL')}</small></td>
-                          <td>
-                            <code className="sha-hash-code" title={log.hashSha256}>
-                              {log.hashSha256 ? `${log.hashSha256.substring(0, 16)}...` : 'HASH-N/A'}
-                            </code>
-                          </td>
-                          <td>${Number(log.total || 0).toLocaleString('es-CL')}</td>
-                          <td><span className="badge-confirmed">ACK CONFIRMADO</span></td>
-                        </tr>
-                      ))}
+                      {auditLogs.map((log, idx) => {
+                        const pedidoId = log.pedidoId || log.idPedido || `PED-${idx + 1}`;
+                        const hash = log.hashIntegridad || log.hashSha256 || 'HASH-N/A';
+                        const fecha = log.fechaRegistroAuditoria || log.fechaPedido || log.fechaCreacion || log.timestamp;
+                        const monto = log.totalFacturado || log.total || 0;
+                        const estado = log.estadoAuditoria || 'AUDITADO_CONFORME';
+
+                        return (
+                          <tr key={log.auditId || idx}>
+                            <td><strong>{pedidoId}</strong></td>
+                            <td>{log.clienteEmail || 'cliente@pedidos360.com'}</td>
+                            <td><small>{fecha ? new Date(fecha).toLocaleString('es-CL') : 'En proceso'}</small></td>
+                            <td>
+                              <code className="sha-hash-code" title={hash}>
+                                {hash.length > 16 ? `${hash.substring(0, 16)}...` : hash}
+                              </code>
+                            </td>
+                            <td>${Number(monto).toLocaleString('es-CL')}</td>
+                            <td><span className="badge-confirmed">{estado}</span></td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 )}

@@ -12,6 +12,17 @@ echo "=========================================================="
 sudo apt-get update -y
 sudo apt-get install -y ca-certificates curl gnupg lsb-release git
 
+# 1.1 Configurar 4GB de memoria Swap para compilar y ejecutar microservicios sin OOM
+if [ ! -f /swapfile ]; then
+    echo "💾 Configurando 4GB de memoria Swap..."
+    sudo fallocate -l 4G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=4096
+    sudo chmod 600 /swapfile
+    sudo mkswap /swapfile
+    sudo swapon /swapfile
+    echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+    echo "✅ Swap de 4GB activado."
+fi
+
 # 2. Instalar Docker si no está instalado
 if ! command -v docker &> /dev/null; then
     echo "📦 Instalando Docker Engine..."

@@ -192,6 +192,8 @@ services:
       RABBITMQ_USERNAME: pedidos360_user
       RABBITMQ_PASSWORD: pedidos360_pass
       SERVER_PORT: 8082
+      SPRING_MAIL_USERNAME: pedidos360.tienda@gmail.com
+      SPRING_MAIL_PASSWORD: ctlhoktpdzgyimhe
     networks:
       - pedidos360-network
 

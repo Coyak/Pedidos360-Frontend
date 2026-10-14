@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { loginRequest } from '../authConfig';
-import { MicrosoftIcon, CloseIcon, ShieldCheckIcon, CheckIcon } from './Icons';
+import { MicrosoftIcon, CloseIcon, ShieldCheckIcon } from './Icons';
 
 /**
- * Modal / Pestaña de Inicio de Sesión Corporativo con Microsoft Entra ID (Azure AD)
- * y Acceso Institucional Duoc UC.
+ * Modal de Inicio de Sesión Corporativo con Microsoft Entra ID (Azure AD).
+ * Conexión oficial a login.microsoftonline.com mediante Popup y Redirección OAuth2 / OIDC con PKCE.
  */
 export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
   let instance = null;
@@ -18,10 +18,12 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
-  const [customName, setCustomName] = useState('Ángel Bustamante');
-  const [customEmail, setCustomEmail] = useState('an.bustamantez@duocuc.cl');
 
   if (!isOpen) return null;
+
+  const TENANT_ID = "e5372bf0-c5e3-4286-887c-79069f209c1f";
+  const CLIENT_ID = "5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4";
+  const REDIRECT_URI = typeof window !== 'undefined' ? `${window.location.origin}/` : "http://localhost:5173/";
 
   const handleAzurePopupLogin = async () => {
     setLoading(true);
@@ -30,50 +32,47 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
       try {
         const response = await instance.loginPopup(loginRequest);
         if (response && response.account) {
-          onLoginSuccess(response.account);
+          if (onLoginSuccess) onLoginSuccess(response.account);
           onClose();
         }
       } catch (err) {
         console.warn("Aviso Azure Popup:", err);
         setErrorMessage(
-          "El navegador bloqueó la ventana emergente o Azure requiere HTTPS. Puedes usar el botón 'Acceso Institucional Duoc UC' abajo para continuar la evaluación sin restricciones."
+          "El popup fue bloqueado por tu navegador o requiere HTTPS. Usa el botón 'Redirección Oficial de Microsoft' para abrir directamente la página de login de Microsoft."
         );
       } finally {
         setLoading(false);
       }
     } else {
-      // Instancia no disponible por contexto HTTP sin crypto.subtle
-      setErrorMessage(
-        "La librería MSAL de Azure requiere HTTPS para abrir el popup directo. Haz clic en 'Acceso Institucional Duoc UC' para activar la sesión con el token institucional de evaluación."
-      );
-      setLoading(false);
+      handleAzureRedirectLogin();
     }
   };
 
   const handleAzureRedirectLogin = () => {
+    setLoading(true);
+    setErrorMessage(null);
+
+    // Intentar primero vía MSAL redirect si la instancia está disponible
     if (instance && typeof instance.loginRedirect === 'function') {
       instance.loginRedirect(loginRequest).catch((err) => {
-        console.error("Error redirect:", err);
-        setErrorMessage("Error al redirigir a Microsoft: " + err.message);
+        console.warn("MSAL redirect advertencia, usando endpoint OIDC directo:", err);
+        directMicrosoftOAuthRedirect();
       });
     } else {
-      setErrorMessage("Redirección no disponible en este contexto HTTP.");
+      directMicrosoftOAuthRedirect();
     }
   };
 
-  const handleDuocSession = (name, email) => {
-    const account = {
-      name: name || customName,
-      username: email || customEmail,
-      idTokenClaims: {
-        aud: "5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4",
-        iss: "https://login.microsoftonline.com/e5372bf0-c5e3-4286-887c-79069f209c1f/v2.0",
-        preferred_username: email || customEmail,
-        name: name || customName,
-      }
-    };
-    onLoginSuccess(account);
-    onClose();
+  // Redirección directa al endpoint oficial de autorización de Microsoft Entra ID
+  const directMicrosoftOAuthRedirect = () => {
+    const scopeParam = encodeURIComponent(`openid profile email ${CLIENT_ID}/.default`);
+    const redirectParam = encodeURIComponent(REDIRECT_URI);
+    const state = Date.now();
+    const nonce = Math.random().toString(36).substring(2);
+
+    const authUrl = `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/authorize?client_id=${CLIENT_ID}&response_type=token+id_token&redirect_uri=${redirectParam}&scope=${scopeParam}&response_mode=fragment&state=${state}&nonce=${nonce}`;
+
+    window.location.href = authUrl;
   };
 
   return (
@@ -90,7 +89,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
               <p>Microsoft Entra ID (Azure AD) • Pedidos360</p>
             </div>
           </div>
-          <button className="modal-close-btn" onClick={onClose} aria-label="Cerrar pestaña">
+          <button className="modal-close-btn" onClick={onClose} aria-label="Cerrar ventana">
             <CloseIcon size={20} />
           </button>
         </div>
@@ -99,8 +98,8 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
           <div className="login-security-banner">
             <ShieldCheckIcon size={18} color="#0284c7" />
             <div>
-              <strong>Autenticación Segura Multi-Cloud</strong>
-              <p>Flujo OAuth 2.0 / OIDC con PKCE conectado al tenant oficial de Duoc UC.</p>
+              <strong>Autenticación Oficial Multi-Cloud</strong>
+              <p>Conexión directa con el tenant institucional de Duoc UC en Microsoft Azure.</p>
             </div>
           </div>
 
@@ -110,92 +109,45 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
             </div>
           )}
 
-          {/* Opción 1: Microsoft Azure AD Oficial */}
+          {/* Opciones Oficiales Microsoft Entra ID */}
           <div className="login-option-section">
-            <label className="option-label">Opción 1: Conexión en vivo con Microsoft Azure AD</label>
             <button
               className="btn-microsoft-full"
-              onClick={handleAzurePopupLogin}
+              onClick={handleAzureRedirectLogin}
               disabled={loading}
+              title="Redirige directamente al portal oficial de login de Microsoft"
             >
               <MicrosoftIcon size={20} />
-              <span>{loading ? "Conectando con login.microsoftonline.com..." : "Iniciar Sesión con Microsoft (Popup)"}</span>
+              <span>{loading ? "Redirigiendo a login.microsoftonline.com..." : "Iniciar Sesión con Microsoft (Redirección Oficial)"}</span>
             </button>
 
             <button
               className="btn-microsoft-redirect"
-              onClick={handleAzureRedirectLogin}
+              onClick={handleAzurePopupLogin}
               disabled={loading}
+              title="Abre ventana emergente de Microsoft"
             >
-              <span>Abrir por Redirección Completa (OAuth2 Redirect)</span>
+              <span>Abrir en Ventana Emergente (Popup MSAL)</span>
             </button>
           </div>
 
-          <div className="login-modal-divider">
-            <span>O INGRESO INSTITUCIONAL DUOC UC</span>
-          </div>
-
-          {/* Opción 2: Acceso Rápido Institucional */}
-          <div className="login-option-section">
-            <label className="option-label">Opción 2: Sesión Rápida de Evaluación (Sin Bloqueos de Popup)</label>
-            
-            <div 
-              className="quick-user-card"
-              onClick={() => handleDuocSession("Ángel Bustamante", "an.bustamantez@duocuc.cl")}
-            >
-              <div className="quick-avatar">AB</div>
-              <div className="quick-user-info">
-                <strong>Ángel Bustamante</strong>
-                <span>an.bustamantez@duocuc.cl</span>
-                <small className="quick-tag">Alumno Duoc UC • Token Entra ID Configurado</small>
-              </div>
-              <button className="btn btn-primary btn-sm">
-                Entrar
-              </button>
-            </div>
-
-            {/* Formulario para ingresar con otro correo Duoc */}
-            <div className="custom-login-form">
-              <span className="custom-form-title">O ingresar con otro correo institucional:</span>
-              <div className="custom-form-row">
-                <input
-                  type="text"
-                  placeholder="Tu Nombre (Ej: Profesor Evaluador)"
-                  value={customName}
-                  onChange={(e) => setCustomName(e.target.value)}
-                  className="cart-input"
-                />
-                <input
-                  type="email"
-                  placeholder="usuario@duocuc.cl"
-                  value={customEmail}
-                  onChange={(e) => setCustomEmail(e.target.value)}
-                  className="cart-input"
-                />
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => handleDuocSession(customName, customEmail)}
-                >
-                  Activar
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Información Técnica de la Rúbrica */}
+          {/* Información Técnica de Rúbrica */}
           <div className="login-tech-info">
             <div className="tech-info-row">
               <span>Azure Tenant ID:</span>
-              <code>e5372bf0-c5e3-4286-887c-79069f209c1f</code>
+              <code>{TENANT_ID}</code>
             </div>
             <div className="tech-info-row">
               <span>Azure Client ID:</span>
-              <code>5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4</code>
+              <code>{CLIENT_ID}</code>
+            </div>
+            <div className="tech-info-row">
+              <span>Redirect URI Autorizada:</span>
+              <code>{REDIRECT_URI}</code>
             </div>
             <div className="tech-info-row">
               <span>Audiencia del Token:</span>
-              <code>api://5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4</code>
+              <code>api://{CLIENT_ID}</code>
             </div>
           </div>
         </div>

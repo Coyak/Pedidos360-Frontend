@@ -1,3 +1,4 @@
+import './cryptoPolyfill'; // Activa soporte WebCrypto SHA-256 en HTTP IP pública
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { PublicClientApplication } from '@azure/msal-browser';
@@ -12,7 +13,7 @@ let msalInstance = null;
 try {
   msalInstance = new PublicClientApplication(msalConfig);
 } catch (error) {
-  console.warn("MSAL no pudo crearse directamente (contexto no seguro o sin crypto):", error);
+  console.error("Error al inicializar MSAL PublicClientApplication:", error);
 }
 
 const renderApplication = () => {
@@ -25,7 +26,6 @@ const renderApplication = () => {
       </React.StrictMode>
     );
   } else {
-    // Si MSAL falla al instanciar, renderiza la app de todos modos sin pantalla blanca
     root.render(
       <React.StrictMode>
         <App />
@@ -36,9 +36,19 @@ const renderApplication = () => {
 
 if (msalInstance && typeof msalInstance.initialize === 'function') {
   msalInstance.initialize()
-    .then(renderApplication)
+    .then(() => {
+      // Manejar el retorno de la redirección de Microsoft Entra ID
+      return msalInstance.handleRedirectPromise();
+    })
+    .then((response) => {
+      if (response && response.account) {
+        msalInstance.setActiveAccount(response.account);
+        console.log("Sesión Microsoft Entra ID iniciada con éxito:", response.account);
+      }
+      renderApplication();
+    })
     .catch((err) => {
-      console.warn("Advertencia en msalInstance.initialize():", err);
+      console.warn("Advertencia en inicialización/redirección MSAL:", err);
       renderApplication();
     });
 } else {

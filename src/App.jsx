@@ -37,6 +37,41 @@ function App() {
     } catch {}
   };
 
+  // Escuchar retorno de Microsoft Entra ID OAuth2 (#id_token=... o #access_token=...)
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const hash = window.location.hash.substring(1);
+      const params = new URLSearchParams(hash);
+      const token = params.get('id_token') || params.get('access_token');
+      if (token) {
+        try {
+          const parts = token.split('.');
+          if (parts.length >= 2) {
+            const base64Url = parts[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(
+              atob(base64)
+                .split('')
+                .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                .join('')
+            );
+            const payload = JSON.parse(jsonPayload);
+            const account = {
+              name: payload.name || payload.preferred_username || 'Usuario Microsoft',
+              username: payload.preferred_username || payload.email || payload.upn || 'usuario@duocuc.cl',
+              idTokenClaims: payload,
+              accessToken: token,
+            };
+            handleLoginSuccess(account);
+            window.history.replaceState(null, '', window.location.pathname);
+          }
+        } catch (e) {
+          console.warn("No se pudo procesar el token retornado de Microsoft:", e);
+        }
+      }
+    }
+  }, []);
+
   const [products] = useState(initialProducts);
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [searchTerm, setSearchTerm] = useState('');

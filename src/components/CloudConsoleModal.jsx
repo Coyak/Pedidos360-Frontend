@@ -110,6 +110,7 @@ export const CloudConsoleModal = ({ isOpen, onClose }) => {
         body: JSON.stringify({
           destinatario: notifyEmail,
           asunto: notifySubject,
+          mensaje: notifyMessage,
           cuerpo: notifyMessage,
         }),
       });

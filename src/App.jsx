@@ -6,6 +6,7 @@ import Carrito from './components/Carrito';
 import OrderSuccessModal from './components/OrderSuccessModal';
 import MisComprasModal from './components/MisComprasModal';
 import WebpayModal from './components/WebpayModal';
+import WebpayCallbackPage from './components/WebpayCallbackPage';
 import ProductDetailPage from './components/ProductDetailPage';
 import CloudOpsView from './components/CloudOpsView';
 import { SearchIcon, CartIcon, CloseIcon, CloudIcon, QueueIcon, ShieldCheckIcon } from './components/Icons';
@@ -75,27 +76,45 @@ function App() {
     }
   }, []);
 
-  // Sincronización de Rutas con window.location (Hash Routing nativo: #/, #/producto/:id, #/cloudops)
+  // Sincronización de Rutas (Soporta Hash Routing y URL directas: /, /dashboard, /callback, /producto/:id)
   const parseCurrentRoute = () => {
     if (typeof window === 'undefined') return { view: 'home', param: null };
-    const hash = window.location.hash || '#/';
+    const pathname = window.location.pathname || '';
+    const hash = window.location.hash || '';
+    const search = window.location.search || '';
+
+    // 1. Retorno de Webpay Plus (/callback o ?token_ws=...)
+    if (pathname.includes('/callback') || hash.includes('/callback') || search.includes('token_ws')) {
+      const urlParams = new URLSearchParams(search || hash.split('?')[1] || '');
+      const token = urlParams.get('token_ws') || urlParams.get('token');
+      return { view: 'callback', param: token };
+    }
+
+    // 2. Consola Cloud Ops & Telemetría (#/cloudops o /dashboard)
+    if (pathname.includes('/dashboard') || hash.startsWith('#/cloudops') || hash.startsWith('#/dashboard')) {
+      return { view: 'cloudops', param: null };
+    }
+
+    // 3. Ficha dedicada de producto (#/producto/:id)
     if (hash.startsWith('#/producto/')) {
       return { view: 'product', param: hash.replace('#/producto/', '') };
     }
-    if (hash === '#/cloudops') {
-      return { view: 'cloudops', param: null };
-    }
+
     return { view: 'home', param: null };
   };
 
   const [currentRoute, setCurrentRoute] = useState(parseCurrentRoute());
 
   useEffect(() => {
-    const handleHashChange = () => {
+    const handleLocationChange = () => {
       setCurrentRoute(parseCurrentRoute());
     };
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    window.addEventListener('hashchange', handleLocationChange);
+    window.addEventListener('popstate', handleLocationChange);
+    return () => {
+      window.removeEventListener('hashchange', handleLocationChange);
+      window.removeEventListener('popstate', handleLocationChange);
+    };
   }, []);
 
   // Función unificada de navegación
@@ -107,6 +126,8 @@ function App() {
       window.location.hash = `#/producto/${param}`;
     } else if (view === 'cloudops') {
       window.location.hash = '#/cloudops';
+    } else if (view === 'callback') {
+      window.location.hash = `#/callback${param ? `?token_ws=${param}` : ''}`;
     }
   };
 
@@ -114,7 +135,7 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [refreshStockCounter, setRefreshStockCounter] = useState(0);
 
-  // Carrito vacío por defecto (sin productos pre-agregados)
+  // Carrito vacío por defecto
   const [cartItems, setCartItems] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isComprasOpen, setIsComprasOpen] = useState(false);
@@ -221,7 +242,7 @@ function App() {
               <button
                 className={`nav-tab-btn ${currentRoute.view === 'cloudops' ? 'active' : ''}`}
                 onClick={() => navigateTo('cloudops')}
-                title="Consola técnica disponible para usuarios autenticados"
+                title="Consola técnica disponible para operadores y usuarios autenticados"
               >
                 <span className="live-dot-green"></span>
                 <span>⚡ Cloud Ops & Telemetría</span>
@@ -250,24 +271,25 @@ function App() {
                   onClick={() => setSearchTerm('')}
                   aria-label="Limpiar búsqueda"
                 >
-                  <CloseIcon size={16} />
+                  <CloseIcon size={14} />
                 </button>
               )}
             </div>
           </div>
         )}
 
-        {/* Acciones del Header */}
+        {/* Acciones de la derecha: Mis Compras, Carrito y Sesión */}
         <div className="header-right">
-          {/* Botón Mis Compras (Sellos SHA-256) */}
-          <button
-            className="compras-nav-btn"
-            onClick={() => setIsComprasOpen(true)}
-            title="Ver historial de compras y comprobantes de auditoría"
-          >
-            <ShieldCheckIcon size={16} color="#10b981" />
-            <span className="compras-nav-text">Mis Compras</span>
-          </button>
+          {activeAccount && (
+            <button
+              className="btn btn-secondary-nav"
+              onClick={() => setIsComprasOpen(true)}
+              title="Ver historial criptográfico de compras asentadas en Auditoría SHA-256"
+            >
+              <span>📜</span>
+              <span>Mis Compras</span>
+            </button>
+          )}
 
           {/* Carrito de Compras */}
           <button
@@ -310,16 +332,30 @@ function App() {
 
       {/* 2. Ruteo de Vistas */}
 
-      {/* RUTA 1: Centro Cloud Ops & Telemetría (#/cloudops) */}
+      {/* RUTA 1: Retorno Oficial de Transbank Webpay Plus (/callback) */}
+      {currentRoute.view === 'callback' && (
+        <main className="app-main">
+          <WebpayCallbackPage
+            token={currentRoute.param}
+            onReturnHome={() => navigateTo('home')}
+            onReturnCloudOps={() => navigateTo('cloudops')}
+          />
+        </main>
+      )}
+
+      {/* RUTA 2: Centro Cloud Ops & Telemetría (#/cloudops o /dashboard) */}
       {currentRoute.view === 'cloudops' && (
         <main className="app-main">
           {activeAccount ? (
             <CloudOpsView />
           ) : (
             <div style={{ textAlign: 'center', padding: '5rem 1rem' }}>
-              <h3>Acceso Restringido</h3>
-              <p style={{ color: '#94a3b8' }}>Debes iniciar sesión con tu cuenta corporativa para acceder al centro de operaciones.</p>
-              <button className="btn btn-primary" onClick={() => navigateTo('home')} style={{ marginTop: '1rem' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔒</div>
+              <h3 style={{ color: '#ffffff', fontSize: '1.4rem', fontWeight: 800 }}>Acceso Restringido</h3>
+              <p style={{ color: '#94a3b8', maxWidth: '420px', margin: '0.5rem auto' }}>
+                Debes iniciar sesión con tu cuenta corporativa para acceder al centro de operaciones y monitoreo multi-nube.
+              </p>
+              <button className="btn btn-primary" onClick={() => navigateTo('home')} style={{ marginTop: '1.5rem' }}>
                 Volver a la Tienda
               </button>
             </div>
@@ -327,7 +363,7 @@ function App() {
         </main>
       )}
 
-      {/* RUTA 2: Página Dedicada de Producto (#/producto/:id) */}
+      {/* RUTA 3: Página Dedicada de Producto (#/producto/:id) */}
       {currentRoute.view === 'product' && (
         <main className="app-main">
           <ProductDetailPage
@@ -339,7 +375,7 @@ function App() {
         </main>
       )}
 
-      {/* RUTA 3: Tienda y Catálogo General (#/ o ruta por defecto) */}
+      {/* RUTA 4: Tienda y Catálogo General (#/ o ruta por defecto) */}
       {currentRoute.view === 'home' && (
         <>
           <section className="store-hero">

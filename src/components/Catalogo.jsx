@@ -3,6 +3,11 @@ import { initialProducts, categories } from '../data/products';
 import { StarIcon, CheckIcon, EmptyBoxIcon, RefreshIcon } from './Icons';
 import { getApiEndpoints } from '../config/apiConfig';
 
+/**
+ * Catálogo Principal de Productos - Pedidos360 Enterprise Store
+ * Presenta 32 productos en 5 categorías (Laptops, Periféricos, Monitores, Audio, Almacenamiento).
+ * Sincroniza stock e inventario en tiempo real con catalogo-api (:8080).
+ */
 export const Catalogo = ({
   selectedCategory,
   onSelectCategory,
@@ -14,7 +19,7 @@ export const Catalogo = ({
 }) => {
   const [productsList, setProductsList] = useState(initialProducts);
   const [loading, setLoading] = useState(false);
-  const [backendConnected, setBackendConnected] = useState(false);
+  const [backendConnected, setBackendConnected] = useState(true);
 
   const endpoints = getApiEndpoints();
   const API_PRODUCTOS_URL = endpoints.catalogoProductos;
@@ -28,12 +33,14 @@ export const Catalogo = ({
         if (Array.isArray(data) && data.length > 0) {
           const normalized = data.map((item) => {
             const id = item.id || `PROD-${Math.random().toString(36).substring(7).toUpperCase()}`;
-            const localMatch = initialProducts.find((p) => p.id === id);
+            // Emparejar por ID o por nombre con el catálogo local enriquecido
+            const localMatch = initialProducts.find((p) => p.id === id) ||
+              initialProducts.find((p) => p.name.toLowerCase().trim() === (item.nombre || item.name || '').toLowerCase().trim());
 
             return {
               id: id,
               name: item.nombre || item.name || localMatch?.name || 'Dispositivo Tecnológico',
-              description: item.descripcion || item.description || localMatch?.description || 'Equipamiento de alto rendimiento con garantía oficial.',
+              description: item.descripcion || item.description || localMatch?.description || 'Equipamiento oficial de alto rendimiento.',
               price: Number(item.precio || item.price || localMatch?.price || 49990),
               stock: item.stock !== undefined ? Number(item.stock) : (localMatch?.stock || 10),
               category: item.categoria || item.category || localMatch?.category || 'Laptops',
@@ -114,8 +121,8 @@ export const Catalogo = ({
 
         <div className="catalog-status-actions">
           <div className="backend-sync-indicator" title="Conectado a la infraestructura de microservicios en la nube">
-            <span className="dot online"></span>
-            <span className="sync-text">Inventario en Línea</span>
+            <span className={`dot ${backendConnected ? 'online' : 'degraded'}`}></span>
+            <span className="sync-text">{backendConnected ? 'Inventario en Línea (:8080)' : 'Modo Autónomo'}</span>
           </div>
 
           <button

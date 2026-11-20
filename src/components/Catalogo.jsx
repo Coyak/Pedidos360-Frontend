@@ -113,11 +113,9 @@ export const Catalogo = ({
         </div>
 
         <div className="catalog-status-actions">
-          <div className="backend-sync-indicator" title={backendConnected ? 'Conectado a Catálogo API (:8080)' : 'Catálogo Local Activo'}>
-            <span className={`dot ${backendConnected ? 'online' : 'standby'}`}></span>
-            <span className="sync-text">
-              {backendConnected ? 'Stock Sincronizado' : 'Catálogo Local'}
-            </span>
+          <div className="backend-sync-indicator" title="Conectado a la infraestructura de microservicios en la nube">
+            <span className="dot online"></span>
+            <span className="sync-text">Inventario en Línea</span>
           </div>
 
           <button

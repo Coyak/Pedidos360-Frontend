@@ -6,6 +6,9 @@ import Carrito from './components/Carrito';
 import OrderSuccessModal from './components/OrderSuccessModal';
 import CloudConsoleModal from './components/CloudConsoleModal';
 import MisComprasModal from './components/MisComprasModal';
+import WebpayModal from './components/WebpayModal';
+import RecomendacionesSection from './components/RecomendacionesSection';
+import LiveAnalyticsModal from './components/LiveAnalyticsModal';
 import { SearchIcon, CartIcon, CloseIcon, CloudIcon, QueueIcon, ShieldCheckIcon } from './components/Icons';
 import './App.css';
 
@@ -17,7 +20,7 @@ function App() {
     instance = msal?.instance;
     accounts = msal?.accounts || [];
   } catch (e) {
-    // Si MSAL no está disponible
+    // MSAL provider opcional
   }
 
   const [customAccount, setCustomAccount] = useState(() => {
@@ -67,7 +70,7 @@ function App() {
             window.history.replaceState(null, '', window.location.pathname);
           }
         } catch (e) {
-          console.warn("No se pudo procesar el token retornado de Microsoft:", e);
+          console.warn("No se pudo procesar el token de Microsoft:", e);
         }
       }
     }
@@ -89,6 +92,8 @@ function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCloudConsoleOpen, setIsCloudConsoleOpen] = useState(false);
   const [isComprasOpen, setIsComprasOpen] = useState(false);
+  const [isLiveAnalyticsOpen, setIsLiveAnalyticsOpen] = useState(false);
+  const [webpayCheckoutData, setWebpayCheckoutData] = useState(null);
   const [completedOrderData, setCompletedOrderData] = useState(null);
 
   const handleLogout = () => {
@@ -97,9 +102,7 @@ function App() {
       localStorage.removeItem('pedidos360_user');
     } catch {}
     if (instance && typeof instance.logoutPopup === 'function') {
-      instance.logoutPopup().catch((e) => {
-        console.error("Error al cerrar sesión:", e);
-      });
+      instance.logoutPopup().catch(() => {});
     }
   };
 
@@ -149,7 +152,7 @@ function App() {
 
   const handleOrderSuccess = (orderData) => {
     setCompletedOrderData(orderData);
-    setRefreshStockCounter((prev) => prev + 1); // Disparar refresco de stock en Catálogo
+    setRefreshStockCounter((prev) => prev + 1);
   };
 
   const totalCartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
@@ -167,7 +170,7 @@ function App() {
             <div className="logo-badge">360</div>
             <div className="logo-text-group">
               <h1>Pedidos360</h1>
-              <span className="logo-tagline">Cloud Native Store</span>
+              <span className="logo-tagline">Cloud Native Store • EV3</span>
             </div>
           </div>
         </div>
@@ -181,7 +184,7 @@ function App() {
             <input
               type="text"
               className="search-input"
-              placeholder="Buscar laptops gamer, periféricos, audio..."
+              placeholder="Buscar laptops gamer, periféricos, monitores..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -199,25 +202,36 @@ function App() {
 
         {/* Acciones del Header */}
         <div className="header-right">
+          {/* Botón Dashboard Live Analytics (WebSockets +3 Pts) */}
+          <button
+            className="cloud-console-nav-btn pulse-glow"
+            onClick={() => setIsLiveAnalyticsOpen(true)}
+            title="Abrir Dashboard de Telemetría en Vivo (WebSockets + Kafka)"
+            style={{ background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.2) 0%, rgba(56, 189, 248, 0.3) 100%)', border: '1px solid #38bdf8' }}
+          >
+            <span className="live-dot"></span>
+            <span style={{ fontSize: '1.1rem' }}>📊</span>
+            <span className="console-nav-text" style={{ color: '#38bdf8', fontWeight: 'bold' }}>Live Analytics</span>
+          </button>
+
           {/* Botón Mis Compras Recientes (Sellos SHA-256) */}
           <button
             className="compras-nav-btn"
             onClick={() => setIsComprasOpen(true)}
-            title="Ver historial de compras recientes y sellos criptográficos SHA-256"
+            title="Ver historial de compras y auditoría criptográfica"
           >
             <ShieldCheckIcon size={16} color="#10b981" />
             <span className="compras-nav-text">Mis Compras</span>
           </button>
 
-          {/* Botón Consola Cloud Ops (Para el Profesor y Evaluadores) */}
+          {/* Consola de Operaciones RabbitMQ / Cloud Ops */}
           <button
-            className="cloud-console-nav-btn pulse-glow"
+            className="cloud-console-nav-btn"
             onClick={() => setIsCloudConsoleOpen(true)}
-            title="Abrir Consola de Rúbricas: Clúster RabbitMQ, DLQs, Auditoría SHA-256 y API Gateway"
+            title="Abrir Consola Cloud Ops: Clúster RabbitMQ, DLQs y Microservicios"
           >
-            <span className="live-dot"></span>
-            <QueueIcon size={16} color="#38bdf8" />
-            <span className="console-nav-text">Consola Cloud Ops</span>
+            <QueueIcon size={16} color="#94a3b8" />
+            <span className="console-nav-text">Cloud Ops</span>
           </button>
 
           {/* Carrito de Compras */}
@@ -233,7 +247,7 @@ function App() {
             )}
           </button>
 
-          {/* Sección de Autenticación */}
+          {/* Autenticación Azure Entra ID */}
           <div className="auth-section">
             {activeAccount ? (
               <div className="user-profile-menu">
@@ -247,7 +261,7 @@ function App() {
                 <button
                   className="btn btn-logout"
                   onClick={handleLogout}
-                  title="Cerrar Sesión Microsoft"
+                  title="Cerrar Sesión"
                 >
                   Salir
                 </button>
@@ -266,28 +280,34 @@ function App() {
             <span className="dot online"></span>
             <span>Ecosistema Multi-Cloud • AWS & Microsoft Azure</span>
           </div>
-          <h2>Hardware & Tecnología de Alto Rendimiento</h2>
+          <h2>Hardware & Tecnología Cloud Native</h2>
           <p>
-            Plataforma desacoplada con <strong>AWS HTTP API Gateway</strong>, autenticación corporativa <strong>Microsoft Entra ID (PKCE)</strong> y mensajería transaccional con <strong>Clúster RabbitMQ</strong>.
+            Plataforma con <strong>Apache Kafka</strong> para streaming analítico en tiempo real, <strong>Webpay Plus REST (+5 pts)</strong> con regla antifraude, <strong>Amazon DynamoDB (+2 pts)</strong> y <strong>WebSockets (+3 pts)</strong>.
           </p>
           <div className="hero-badges-row">
             <span className="tech-badge aws-chip">
-              <CloudIcon size={14} /> AWS API Gateway
+              <CloudIcon size={14} /> AWS Cloud Native
+            </span>
+            <span className="tech-badge" style={{ background: 'rgba(234, 88, 12, 0.15)', color: '#fb923c', border: '1px solid #ea580c' }}>
+              ⚡ Apache Kafka KRaft
+            </span>
+            <span className="tech-badge" style={{ background: 'rgba(2, 132, 199, 0.15)', color: '#38bdf8', border: '1px solid #0284c7' }}>
+              💳 Webpay Plus (+5 pts)
             </span>
             <span className="tech-badge rabbit-chip">
-              <QueueIcon size={14} /> Clúster RabbitMQ 2 Nodos
-            </span>
-            <span className="tech-badge azure-chip">
-              Azure Entra ID JWT
-            </span>
-            <span className="tech-badge spring-chip">
-              5 Microservicios Spring Boot
+              <QueueIcon size={14} /> RabbitMQ Transaccional
             </span>
           </div>
         </div>
       </section>
 
-      {/* 3. Catálogo Principal con Stock en Vivo */}
+      {/* 3. Sección de Recomendaciones Personalizadas (Apache Kafka) */}
+      <RecomendacionesSection
+        activeAccount={activeAccount}
+        onAddToCart={handleAddToCart}
+      />
+
+      {/* 4. Catálogo Principal con Stock en Vivo */}
       <main className="app-main">
         <Catalogo
           selectedCategory={selectedCategory}
@@ -299,7 +319,7 @@ function App() {
         />
       </main>
 
-      {/* 4. Carrito de Compras (Drawer lateral) */}
+      {/* 5. Carrito de Compras (Drawer lateral) */}
       <Carrito
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
@@ -308,34 +328,67 @@ function App() {
         onRemoveItem={handleRemoveItem}
         onClearCart={handleClearCart}
         onOrderSuccess={handleOrderSuccess}
+        onOpenWebpay={(checkoutInfo) => {
+          setIsCartOpen(false);
+          setWebpayCheckoutData(checkoutInfo);
+        }}
         activeAccount={activeAccount}
       />
 
-      {/* 5. Modal de Pedido Procesado */}
+      {/* 6. Modal de Pagos con Webpay Plus y Antifraude (EV3) */}
+      <WebpayModal
+        isOpen={!!webpayCheckoutData}
+        onClose={() => setWebpayCheckoutData(null)}
+        cartItems={cartItems}
+        customerEmail={webpayCheckoutData?.customerEmail || activeAccount?.username || 'cliente@pedidos360.com'}
+        shippingAddress={webpayCheckoutData?.shippingAddress || 'Av. Providencia 1234, Santiago'}
+        totalAmount={webpayCheckoutData?.totalAmount || 0}
+        onPaymentSuccess={(pagoResult) => {
+          handleClearCart();
+          handleOrderSuccess({
+            response: {
+              pedidoId: pagoResult.buyOrder,
+              totalPagar: pagoResult.total,
+              estado: 'CONFIRMADO_WEBPAY',
+            },
+            payload: pagoResult,
+            timestamp: new Date().toISOString(),
+            metodo: 'Webpay Plus REST Oficial',
+          });
+        }}
+      />
+
+      {/* 7. Modal de Dashboard Live Analytics (WebSockets +3 Pts) */}
+      <LiveAnalyticsModal
+        isOpen={isLiveAnalyticsOpen}
+        onClose={() => setIsLiveAnalyticsOpen(false)}
+      />
+
+      {/* 8. Modal de Confirmación de Pedido */}
       <OrderSuccessModal
         orderData={completedOrderData}
         onClose={() => setCompletedOrderData(null)}
       />
 
-      {/* 5.1. Modal de Mis Compras Recientes (Auditoría SHA-256) */}
+      {/* 9. Modal de Mis Compras Recientes (Auditoría SHA-256) */}
       <MisComprasModal
         isOpen={isComprasOpen}
         onClose={() => setIsComprasOpen(false)}
         activeAccount={activeAccount}
       />
 
-      {/* 6. Consola de Microservicios & RabbitMQ (Rúbricas EP3 y EP4) */}
+      {/* 10. Consola de Microservicios & RabbitMQ */}
       <CloudConsoleModal
         isOpen={isCloudConsoleOpen}
         onClose={() => setIsCloudConsoleOpen(false)}
       />
 
-      {/* 7. Footer Limpio */}
+      {/* 11. Footer */}
       <footer className="app-footer">
         <div className="footer-content">
-          <p>© 2026 Pedidos360 Cloud Store • Plataforma Cloud Native Multi-Cloud</p>
+          <p>© 2026 Pedidos360 Cloud Store • Evaluación 3 Desarrollo Cloud Native</p>
           <div className="footer-links">
-            <span>Perímetro Cloud: <code>AWS HTTP API Gateway (v1)</code></span>
+            <span>Perímetro: <code>AWS Cloud Native (Sin Proxies Caseros)</code></span>
           </div>
         </div>
       </footer>

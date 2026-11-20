@@ -1,10 +1,12 @@
 /**
- * Configuración centralizada de Endpoints Multi-Nube (Nginx Proxy, Directo EC2 y AWS API Gateway)
+ * Configuración centralizada de Endpoints Multi-Nube (Pedidos360 - EV3)
+ * Soporta conexión directa a microservicios en puertos 8080..8086 y AWS API Gateway.
+ * Sin proxies caseros intermedios Nginx.
  */
 
 export const AWS_API_GATEWAY_URL = 'https://op6erfwwmh.execute-api.us-east-1.amazonaws.com/v1';
 
-// Detectar hostname actual (localhost o IP pública de EC2)
+// Detectar hostname actual (localhost o IP pública de EC2 en AWS)
 export const getBaseHost = () => {
   if (typeof window !== 'undefined' && window.location.hostname) {
     return window.location.hostname;
@@ -17,39 +19,15 @@ export const getApiEndpoints = (targetMode = null) => {
   const savedMode = typeof localStorage !== 'undefined' ? localStorage.getItem('pedidos360_api_mode') : null;
   const isLocal = host === 'localhost' || host === '127.0.0.1';
   
-  // Modos disponibles: 'direct' (puertos 8080..8084), 'proxy' (Nginx relativo /api/...), 'cloud' (AWS Gateway)
-  // En producción (puerto 80 o IP pública), 'proxy' o 'direct' garantizan conectividad inmediata sin bloqueos CORS
+  // Por defecto 'direct' para conectar directamente con los microservicios
   let defaultMode = 'direct';
-  if (typeof window !== 'undefined' && (window.location.port === '80' || window.location.port === '')) {
-    defaultMode = 'proxy';
-  }
-  
   const mode = targetMode || savedMode || defaultMode;
-
-  if (mode === 'proxy') {
-    return {
-      mode: 'proxy',
-      label: `Proxy Nginx Integrado (/api/*)`,
-      catalogoStatus: `/api/status`,
-      catalogoProductos: `/api/productos`,
-      carritoStatus: `/api/carrito/status`,
-      carritoPedidos: `/api/carrito/pedidos`,
-      notificacionesStatus: `/api/notificaciones/status`,
-      notificacionesEnviar: `/api/notificaciones/enviar`,
-      notificacionesHistorial: `/api/notificaciones/historial`,
-      auditoriaStatus: `/api/auditoria/status`,
-      auditoriaEventos: `/api/auditoria`,
-      auditoriaStats: `/api/auditoria/stats`,
-      adminQueues: `/api/admin/queues`,
-      adminExchanges: `/api/admin/exchanges`,
-      adminBindings: `/api/admin/bindings`,
-    };
-  }
 
   if (mode === 'direct' || mode === 'local') {
     return {
       mode: 'direct',
-      label: `Servidores Directos (http://${host}:8080..8084)`,
+      label: `Servidores Directos (http://${host}:8080..8086)`,
+      // EV2 Microservicios
       catalogoStatus: `http://${host}:8080/api/status`,
       catalogoProductos: `http://${host}:8080/api/productos`,
       carritoStatus: `http://${host}:8081/api/carrito/status`,
@@ -63,10 +41,20 @@ export const getApiEndpoints = (targetMode = null) => {
       adminQueues: `http://${host}:8084/api/admin/queues`,
       adminExchanges: `http://${host}:8084/api/admin/exchanges`,
       adminBindings: `http://${host}:8084/api/admin/bindings`,
+      // EV3 Nuevos Microservicios
+      pagosStatus: `http://${host}:8085/api/pagos/status`,
+      pagosIniciar: `http://${host}:8085/api/pagos/iniciar`,
+      pagosCommit: `http://${host}:8085/api/pagos/commit`,
+      pagosEstadoCliente: `http://${host}:8085/api/pagos/estado-cliente`,
+      analyticsStatus: `http://${host}:8086/api/recomendaciones/status`,
+      analyticsRecomendaciones: `http://${host}:8086/api/recomendaciones`,
+      analyticsInteraccion: `http://${host}:8086/api/recomendaciones/interaccion`,
+      analyticsWs: `ws://${host}:8086/ws-analytics-raw`,
+      analyticsWsSockJs: `http://${host}:8086/ws-analytics`,
     };
   }
 
-  // Cloud Mode: AWS HTTP API Gateway (Punto de entrada único)
+  // Cloud Mode: AWS HTTP API Gateway (Perímetro Cloud)
   return {
     mode: 'cloud',
     label: 'AWS HTTP API Gateway (Perímetro Cloud)',
@@ -83,6 +71,15 @@ export const getApiEndpoints = (targetMode = null) => {
     adminQueues: `${AWS_API_GATEWAY_URL}/api/admin/queues`,
     adminExchanges: `${AWS_API_GATEWAY_URL}/api/admin/exchanges`,
     adminBindings: `${AWS_API_GATEWAY_URL}/api/admin/bindings`,
+    pagosStatus: `http://${host}:8085/api/pagos/status`,
+    pagosIniciar: `http://${host}:8085/api/pagos/iniciar`,
+    pagosCommit: `http://${host}:8085/api/pagos/commit`,
+    pagosEstadoCliente: `http://${host}:8085/api/pagos/estado-cliente`,
+    analyticsStatus: `http://${host}:8086/api/recomendaciones/status`,
+    analyticsRecomendaciones: `http://${host}:8086/api/recomendaciones`,
+    analyticsInteraccion: `http://${host}:8086/api/recomendaciones/interaccion`,
+    analyticsWs: `ws://${host}:8086/ws-analytics-raw`,
+    analyticsWsSockJs: `http://${host}:8086/ws-analytics`,
   };
 };
 

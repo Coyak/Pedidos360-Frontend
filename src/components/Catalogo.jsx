@@ -55,8 +55,7 @@ export const Catalogo = ({
           setBackendConnected(true);
         }
       }
-    } catch (err) {
-      console.warn("Backend Catálogo offline o en CORS, usando inventario local:", err);
+    } catch {
       setBackendConnected(false);
     } finally {
       setLoading(false);
@@ -81,9 +80,44 @@ export const Catalogo = ({
     return found ? found.quantity : 0;
   };
 
+  const handleAddToCartWithKafka = (product) => {
+    onAddToCart(product);
+    // Publicar evento asíncrono a Apache Kafka
+    try {
+      fetch(endpoints.analyticsInteraccion, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: 'cliente@pedidos360.com',
+          itemId: product.id,
+          action: 'cart',
+          category: product.category,
+          productType: 'Hardware',
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+    } catch {}
+  };
+
+  const handleVerDetalleKafka = (product) => {
+    try {
+      fetch(endpoints.analyticsInteraccion, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: 'cliente@pedidos360.com',
+          itemId: product.id,
+          action: 'view',
+          category: product.category,
+          productType: 'Hardware',
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+    } catch {}
+  };
+
   return (
     <section className="catalog-section">
-      {/* Barra de Filtros y Estado de Inventario */}
       <div className="catalog-toolbar">
         <div className="categories-pill-list">
           {categories.map((cat) => (
@@ -98,10 +132,10 @@ export const Catalogo = ({
         </div>
 
         <div className="catalog-status-actions">
-          <div className="backend-sync-indicator" title={backendConnected ? 'Conectado a AWS Catálogo API' : 'Modo Offline / Caché'}>
+          <div className="backend-sync-indicator" title={backendConnected ? 'Conectado a Catálogo API' : 'Modo Offline / Local'}>
             <span className={`dot ${backendConnected ? 'online' : 'standby'}`}></span>
             <span className="sync-text">
-              {backendConnected ? 'Inventario AWS Sincronizado' : 'Catálogo Local'}
+              {backendConnected ? 'Inventario Sincronizado' : 'Catálogo Local'}
             </span>
           </div>
 
@@ -109,7 +143,7 @@ export const Catalogo = ({
             className="btn-refresh-catalog"
             onClick={fetchLiveProducts}
             disabled={loading}
-            title="Refrescar stock en vivo desde RabbitMQ"
+            title="Refrescar stock en vivo"
             aria-label="Actualizar catálogo"
           >
             <RefreshIcon size={14} className={loading ? 'spin' : ''} />
@@ -118,13 +152,11 @@ export const Catalogo = ({
         </div>
       </div>
 
-      {/* Contador de Productos */}
       <div className="results-indicator">
         <span>Mostrando <strong>{filteredProducts.length}</strong> productos disponibles</span>
         {searchTerm && <span> para la búsqueda "<em>{searchTerm}</em>"</span>}
       </div>
 
-      {/* Grilla de Productos */}
       {filteredProducts.length === 0 ? (
         <div className="empty-catalog-state">
           <div className="empty-icon-wrapper">
@@ -143,7 +175,11 @@ export const Catalogo = ({
             const isOutOfStock = product.stock <= 0;
 
             return (
-              <div key={product.id} className="product-card">
+              <div
+                key={product.id}
+                className="product-card"
+                onClick={() => handleVerDetalleKafka(product)}
+              >
                 <div className="product-card-top">
                   <span className="product-category-tag">{product.category}</span>
                   {product.tag && (
@@ -183,7 +219,10 @@ export const Catalogo = ({
 
                   <button
                     className={`btn btn-add-cart ${inCartCount > 0 ? 'in-cart' : ''}`}
-                    onClick={() => onAddToCart(product)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAddToCartWithKafka(product);
+                    }}
                     disabled={isOutOfStock}
                     aria-label={`Agregar ${product.name} al carrito`}
                   >

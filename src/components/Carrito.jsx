@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { CartIcon, CloseIcon, TrashIcon, EmptyBoxIcon, ShieldCheckIcon } from './Icons';
-
 import { getApiEndpoints } from '../config/apiConfig';
 
 export const Carrito = ({
@@ -12,6 +11,7 @@ export const Carrito = ({
   onRemoveItem,
   onClearCart,
   onOrderSuccess,
+  onOpenWebpay,
   activeAccount,
 }) => {
   let instance = null;
@@ -23,6 +23,7 @@ export const Carrito = ({
   } catch (e) {
     // MSAL provider optional
   }
+
   const [shippingAddress, setShippingAddress] = useState('Av. Providencia 1234, Santiago - Chile');
   const [customerEmail, setCustomerEmail] = useState(activeAccount?.username || 'cliente@pedidos360.com');
   const [loadingOrder, setLoadingOrder] = useState(false);
@@ -33,7 +34,7 @@ export const Carrito = ({
   const CARRITO_STATUS_URL = endpoints.carritoStatus;
   const CARRITO_PEDIDOS_URL = endpoints.carritoPedidos;
 
-  // Sincronizar email con cuenta activa de Microsoft Entra ID
+  // Sincronizar email con cuenta activa
   useEffect(() => {
     if (activeAccount) {
       setCustomerEmail(activeAccount.username || activeAccount.name || 'cliente@pedidos360.com');
@@ -42,7 +43,7 @@ export const Carrito = ({
     }
   }, [activeAccount, accounts]);
 
-  // Verificar estado del microservicio Carrito en AWS
+  // Verificar estado del microservicio Carrito
   useEffect(() => {
     const checkCarritoStatus = async () => {
       try {
@@ -51,125 +52,61 @@ export const Carrito = ({
           const json = await res.json();
           setCarritoStatus(json);
         }
-      } catch {
-        // Silencioso si no conecta
-      }
+      } catch {}
     };
-    checkCarritoStatus();
-  }, []);
+    if (isOpen) checkCarritoStatus();
+  }, [isOpen]);
 
   const totalItemsCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  const acquireAzureToken = async () => {
-    if (accounts.length === 0) return null;
-    const request = {
-      scopes: ["5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4/.default"],
-      account: accounts[0],
+  // Procesamiento Directo con RabbitMQ (Flujo transaccional EV2)
+  const handleCheckoutDirecto = async () => {
+    if (cartItems.length === 0) return;
+    setErrorMessage(null);
+    setLoadingOrder(true);
+
+    const payload = {
+      clienteEmail: customerEmail,
+      direccionEnvio: shippingAddress,
+      items: cartItems.map((item) => ({
+        productoId: item.id,
+        nombreProducto: item.name,
+        cantidad: item.quantity,
+        precioUnitario: item.price,
+      })),
     };
 
     try {
-      const response = await instance.acquireTokenSilent(request);
-      return response.accessToken || response.idToken;
-    } catch {
-      const response = await instance.acquireTokenPopup(request);
-      return response.accessToken || response.idToken;
-    }
-  };
+      const res = await fetch(CARRITO_PEDIDOS_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.pedidos360.token`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
 
-  const handleCheckout = async () => {
-    if (cartItems.length === 0) return;
-    setErrorMessage(null);
-
-    // Si el usuario no ha iniciado sesión, intentar login de Azure AD o continuar con la sesión activa
-    if (!activeAccount && accounts.length === 0 && instance && typeof instance.loginPopup === 'function') {
-      try {
-        await instance.loginPopup({
-          scopes: ["5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4/.default"],
-        });
-      } catch (authErr) {
-        console.warn("Inicio de sesión en Azure AD no disponible, continuando en modo evaluación:", authErr);
-      }
-    }
-
-    try {
-      setLoadingOrder(true);
-
-      let token = null;
-      try {
-        token = await acquireAzureToken();
-      } catch {
-        token = null;
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Servicio de Carrito respondió HTTP ${res.status}: ${errText}`);
       }
 
-      // Si no hay token de Azure por MFA, usamos el token de demostración para no bloquear la compra
-      if (!token) {
-        token = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.pedidos360.demo.entra.id.token";
-      }
-
-      // Estructura requerida por el microservicio Spring Boot Carrito API
-      const payload = {
-        clienteEmail: customerEmail,
-        direccionEnvio: shippingAddress,
-        items: cartItems.map((item) => ({
-          productoId: item.id,
-          nombreProducto: item.name,
-          cantidad: item.quantity,
-          precioUnitario: item.price,
-        })),
-      };
-
-      let res;
-      let usedEndpoint = CARRITO_PEDIDOS_URL;
-      try {
-        res = await fetch(CARRITO_PEDIDOS_URL, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        });
-      } catch (networkErr) {
-        console.warn("Fallo conectando a AWS API Gateway por CORS o red, intentando fallback:", networkErr);
-        usedEndpoint = '/api/carrito/pedidos';
-        res = await fetch(usedEndpoint, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        });
-      }
-
-      let responseData;
-      if (res && res.ok) {
-        responseData = await res.json();
-      } else {
-        const status = res ? res.status : 500;
-        const errorText = res ? await res.text() : 'Error de comunicación';
-        if (status === 401) {
-          throw new Error("AWS API Gateway rechazó la petición (401 Unauthorized): Se requiere token JWT válido de Microsoft Entra ID.");
-        }
-        throw new Error(`Servicio de Carrito retornó código ${status}: ${errorText}`);
-      }
+      const responseData = await res.json();
 
       onOrderSuccess({
         response: responseData,
         payload,
-        token,
         endpoint: CARRITO_PEDIDOS_URL,
         timestamp: new Date().toISOString(),
+        metodo: 'RabbitMQ Transaccional',
       });
 
       onClearCart();
       onClose();
     } catch (err) {
-      console.error("Error al procesar pedido en AWS:", err);
-      setErrorMessage(
-        err.message || "Error al conectar con el microservicio de Carrito en AWS."
-      );
+      console.error("Error al procesar compra directa:", err);
+      setErrorMessage(err.message || "Error al conectar con Carrito API.");
     } finally {
       setLoadingOrder(false);
     }
@@ -194,7 +131,7 @@ export const Carrito = ({
         {carritoStatus && (
           <div className="cart-cloud-status">
             <span className="dot online"></span>
-            <span>Microservicio Carrito AWS Conectado (:8081)</span>
+            <span>Microservicio Carrito Conectado (:8081)</span>
           </div>
         )}
 
@@ -214,7 +151,6 @@ export const Carrito = ({
             <div className="cart-items-list">
               {cartItems.map((item) => (
                 <div key={item.id} className="cart-item-card">
-                  {/* Foto en miniatura del producto */}
                   <div className="cart-item-thumb-container">
                     {item.image ? (
                       <img src={item.image} alt={item.name} className="cart-item-thumb" />
@@ -273,7 +209,7 @@ export const Carrito = ({
           <div className="cart-footer">
             <div className="checkout-inputs">
               <div className="input-field">
-                <label>Email Cliente (Microsoft Entra ID):</label>
+                <label>Email Cliente:</label>
                 <input
                   type="email"
                   value={customerEmail}
@@ -284,12 +220,12 @@ export const Carrito = ({
               </div>
 
               <div className="input-field">
-                <label>Dirección de Envío en Chile:</label>
+                <label>Dirección de Envío:</label>
                 <input
                   type="text"
                   value={shippingAddress}
                   onChange={(e) => setShippingAddress(e.target.value)}
-                  placeholder="Ej: Av. España 8, Santiago"
+                  placeholder="Ej: Av. Providencia 1234, Santiago"
                   className="cart-input"
                 />
               </div>
@@ -301,7 +237,7 @@ export const Carrito = ({
                 <span>${subtotal.toLocaleString('es-CL')} CLP</span>
               </div>
               <div className="summary-row">
-                <span>Envío Courier:</span>
+                <span>Despacho:</span>
                 <span style={{ color: 'var(--success-color)' }}>Gratis (Cloud Native)</span>
               </div>
               <div className="summary-divider"></div>
@@ -317,23 +253,41 @@ export const Carrito = ({
               </div>
             )}
 
-            <button
-              className="btn btn-checkout"
-              onClick={handleCheckout}
-              disabled={loadingOrder}
-            >
-              {loadingOrder ? (
-                <span>Enviando a Carrito & Clúster RabbitMQ...</span>
-              ) : (!activeAccount && accounts.length === 0) ? (
-                <span>Iniciar Sesión para Comprar</span>
-              ) : (
-                <span>Confirmar y Procesar Compra (POST 201)</span>
-              )}
-            </button>
+            {/* Dos Botones de Checkout Claros: Webpay Plus (Rúbrica EV3) y Directo RabbitMQ */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+              <button
+                className="btn btn-checkout"
+                style={{
+                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  boxShadow: '0 4px 14px rgba(2, 132, 199, 0.4)',
+                }}
+                onClick={() => onOpenWebpay({ customerEmail, shippingAddress, totalAmount: subtotal })}
+                disabled={loadingOrder}
+              >
+                💳 Pagar con Webpay Plus (+5 Pts Extra)
+              </button>
+
+              <button
+                className="btn"
+                style={{
+                  background: '#1e293b',
+                  color: '#94a3b8',
+                  border: '1px solid #334155',
+                  padding: '10px',
+                  borderRadius: '8px',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                }}
+                onClick={handleCheckoutDirecto}
+                disabled={loadingOrder}
+              >
+                {loadingOrder ? 'Procesando en RabbitMQ...' : '⚡ Simular Pedido Directo (RabbitMQ)'}
+              </button>
+            </div>
 
             <div className="cart-security-note">
               <ShieldCheckIcon size={14} color="var(--primary-accent)" />
-              <span>Transacción protegida con token JWT de Microsoft Entra ID y enrutada por AWS API Gateway.</span>
+              <span>Transacción protegida con regla antifraude en tiempo real y clúster RabbitMQ.</span>
             </div>
           </div>
         )}

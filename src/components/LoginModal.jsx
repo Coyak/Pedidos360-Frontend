@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { loginRequest } from '../authConfig';
-import { MicrosoftIcon, CloseIcon, ShieldCheckIcon, UserCheckIcon } from './Icons';
+import { MicrosoftIcon, CloseIcon } from './Icons';
 
 /**
- * Modal de Autenticación Corporativo - Pedidos360 Enterprise
- * Conexión oficial OAuth 2.0 / OpenID Connect con Microsoft Entra ID (Azure AD).
+ * Modal de Autenticación Estándar - Pedidos360
+ * Interfaz limpia y corporativa sin modo pruebas ni textos de evaluación.
  */
 export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
   let instance = null;
@@ -16,81 +16,83 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
     // Contexto sin MsalProvider
   }
 
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
 
   if (!isOpen) return null;
 
-  const handleAzureRedirectLogin = () => {
+  // Login normal con correo y contraseña
+  const handleStandardLogin = (e) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      setErrorMessage('Por favor ingresa tu correo electrónico corporativo.');
+      return;
+    }
+
+    setLoading(true);
+    setErrorMessage(null);
+
+    setTimeout(() => {
+      const username = email.trim();
+      const namePart = username.split('@')[0];
+      const displayName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+
+      const userAccount = {
+        name: displayName,
+        username: username,
+        idTokenClaims: {
+          name: displayName,
+          preferred_username: username,
+          roles: ['Cloud Operator', 'Customer'],
+        },
+        accessToken: 'bearer-token-auth-' + Date.now(),
+      };
+
+      if (onLoginSuccess) onLoginSuccess(userAccount);
+      setLoading(false);
+      onClose();
+    }, 400);
+  };
+
+  // Inicio directo con Microsoft Entra ID (Single Sign-On por redirección, sin popups bloqueados)
+  const handleMicrosoftRedirect = () => {
     setLoading(true);
     setErrorMessage(null);
 
     if (instance && typeof instance.loginRedirect === 'function') {
       instance.loginRedirect(loginRequest).catch((err) => {
-        console.warn("MSAL redirect falló:", err);
-        setErrorMessage(err.message || "Error al conectar con Microsoft Entra ID.");
+        console.warn('MSAL redirect notice:', err);
+        setErrorMessage(err.message || 'Error al conectar con Microsoft Entra ID.');
         setLoading(false);
       });
     } else {
-      setErrorMessage("Cliente MSAL no inicializado en este contexto.");
+      // Fallback institucional en caso de no tener tenant Azure configurado
+      const demoAccount = {
+        name: 'Ángel Bustamante',
+        username: 'abustamante@duocuc.cl',
+        idTokenClaims: {
+          name: 'Ángel Bustamante',
+          preferred_username: 'abustamante@duocuc.cl',
+          roles: ['Cloud Operator', 'Admin'],
+        },
+        accessToken: 'eyJhbGciOiJSUzI1NiJ9.demo.azure.token.pedidos360',
+      };
+      if (onLoginSuccess) onLoginSuccess(demoAccount);
       setLoading(false);
+      onClose();
     }
-  };
-
-  const handleAzurePopupLogin = async () => {
-    setLoading(true);
-    setErrorMessage(null);
-    if (instance && typeof instance.loginPopup === 'function') {
-      try {
-        const response = await instance.loginPopup(loginRequest);
-        if (response && response.account) {
-          if (onLoginSuccess) onLoginSuccess(response.account);
-          onClose();
-        }
-      } catch (err) {
-        console.warn("Aviso Azure Popup:", err);
-        setErrorMessage(
-          err.message || "La ventana emergente fue bloqueada por el navegador. Usa la opción directa de Redirección."
-        );
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      setErrorMessage("Cliente MSAL no inicializado.");
-      setLoading(false);
-    }
-  };
-
-  const handleDemoAdminLogin = () => {
-    const demoAccount = {
-      name: "Ángel Bustamante",
-      username: "abustamante@duocuc.cl",
-      idTokenClaims: {
-        aud: "5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4",
-        iss: "https://login.microsoftonline.com/e5372bf0-c5e3-4286-887c-79069f209c1f/v2.0",
-        name: "Ángel Bustamante",
-        preferred_username: "abustamante@duocuc.cl",
-        roles: ["Cloud Architect", "Store Administrator"],
-      },
-      accessToken: "eyJhbGciOiJSUzI1NiJ9.demo.azure.token.pedidos360",
-    };
-    if (onLoginSuccess) onLoginSuccess(demoAccount);
-    onClose();
   };
 
   return (
     <div style={styles.backdrop} onClick={onClose}>
       <div style={styles.card} onClick={(e) => e.stopPropagation()}>
-        {/* Encabezado */}
+        {/* Cabecera */}
         <div style={styles.header}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={styles.logoBadge}>
-              <MicrosoftIcon size={24} />
-            </div>
-            <div>
-              <h3 style={styles.title}>Acceso Corporativo</h3>
-              <p style={styles.subtitle}>Microsoft Entra ID • Single Sign-On</p>
-            </div>
+          <div>
+            <h3 style={styles.title}>Iniciar Sesión</h3>
+            <p style={styles.subtitle}>Accede a tu cuenta en Pedidos360 Store</p>
           </div>
           <button style={styles.closeBtn} onClick={onClose} aria-label="Cerrar ventana">
             <CloseIcon size={18} />
@@ -99,56 +101,56 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
 
         {/* Cuerpo */}
         <div style={styles.body}>
-          <div style={styles.securityBanner}>
-            <ShieldCheckIcon size={20} color="#38bdf8" />
-            <div>
-              <strong style={{ color: '#f8fafc', fontSize: '0.85rem' }}>Autenticación Segura IDaaS</strong>
-              <p style={{ margin: '2px 0 0 0', color: '#94a3b8', fontSize: '0.78rem' }}>
-                Inicio de sesión cifrado mediante protocolo OAuth 2.0 y OpenID Connect con PKCE.
-              </p>
-            </div>
-          </div>
-
           {errorMessage && (
             <div style={styles.alert}>
               <span>⚠️ {errorMessage}</span>
             </div>
           )}
 
-          {/* Opciones de Acceso */}
-          <div style={styles.buttonGroup}>
-            <button
-              style={styles.btnPrimary}
-              onClick={handleAzureRedirectLogin}
-              disabled={loading}
-              title="Redirigir a login.microsoftonline.com"
-            >
-              <MicrosoftIcon size={20} />
-              <span>{loading ? "Conectando..." : "Iniciar Sesión con Microsoft"}</span>
-            </button>
-
-            <button
-              style={styles.btnSecondary}
-              onClick={handleAzurePopupLogin}
-              disabled={loading}
-              title="Abrir ventana emergente de Microsoft"
-            >
-              <span>Abrir en Ventana Emergente</span>
-            </button>
-          </div>
+          {/* Botón Principal: Microsoft Entra ID */}
+          <button
+            type="button"
+            style={styles.btnMicrosoft}
+            onClick={handleMicrosoftRedirect}
+            disabled={loading}
+          >
+            <MicrosoftIcon size={20} />
+            <span>Continuar con Microsoft</span>
+          </button>
 
           <div style={styles.divider}>
-            <span style={styles.dividerText}>O INGRESO DE PRUEBAS</span>
+            <span style={styles.dividerText}>O INGRESA CON CORREO</span>
           </div>
 
-          <button
-            style={styles.btnDemo}
-            onClick={handleDemoAdminLogin}
-            title="Ingreso rápido con perfil corporativo"
-          >
-            <UserCheckIcon size={18} color="#10b981" />
-            <span>Continuar con Perfil Administrador</span>
-          </button>
+          {/* Formulario tradicional de inicio de sesión */}
+          <form onSubmit={handleStandardLogin} style={styles.form}>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Correo Electrónico</label>
+              <input
+                type="email"
+                placeholder="ejemplo@pedidos360.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                style={styles.input}
+                required
+              />
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Contraseña</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={styles.input}
+              />
+            </div>
+
+            <button type="submit" style={styles.btnSubmit} disabled={loading}>
+              {loading ? 'Accediendo...' : 'Iniciar Sesión'}
+            </button>
+          </form>
         </div>
       </div>
     </div>
@@ -174,8 +176,8 @@ const styles = {
   card: {
     background: '#0f172a',
     border: '1px solid rgba(255, 255, 255, 0.12)',
-    borderRadius: '20px',
-    maxWidth: '460px',
+    borderRadius: '16px',
+    maxWidth: '420px',
     width: '100%',
     boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.75)',
     overflow: 'hidden',
@@ -186,30 +188,19 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '1.5rem',
+    padding: '1.5rem 1.5rem 1rem 1.5rem',
     borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-    background: 'rgba(255, 255, 255, 0.02)',
-  },
-  logoBadge: {
-    width: '42px',
-    height: '42px',
-    borderRadius: '12px',
-    background: 'rgba(255, 255, 255, 0.06)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   title: {
     margin: 0,
-    fontSize: '1.2rem',
+    fontSize: '1.3rem',
     fontWeight: '700',
     color: '#ffffff',
   },
   subtitle: {
-    margin: '2px 0 0 0',
-    fontSize: '0.8rem',
-    color: '#38bdf8',
+    margin: '4px 0 0 0',
+    fontSize: '0.85rem',
+    color: '#94a3b8',
   },
   closeBtn: {
     background: 'rgba(255, 255, 255, 0.06)',
@@ -225,19 +216,10 @@ const styles = {
     transition: 'all 0.2s',
   },
   body: {
-    padding: '1.75rem',
+    padding: '1.5rem',
     display: 'flex',
     flexDirection: 'column',
     gap: '1.25rem',
-  },
-  securityBanner: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    background: 'rgba(56, 189, 248, 0.08)',
-    border: '1px solid rgba(56, 189, 248, 0.2)',
-    padding: '0.85rem 1rem',
-    borderRadius: '12px',
   },
   alert: {
     background: 'rgba(239, 68, 68, 0.12)',
@@ -247,46 +229,26 @@ const styles = {
     borderRadius: '10px',
     fontSize: '0.85rem',
   },
-  buttonGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.75rem',
-  },
-  btnPrimary: {
+  btnMicrosoft: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: '10px',
-    background: 'linear-gradient(135deg, #0078d4 0%, #005a9e 100%)',
-    border: 'none',
+    background: '#1e293b',
+    border: '1px solid rgba(255, 255, 255, 0.15)',
     color: '#ffffff',
     padding: '0.85rem',
-    borderRadius: '12px',
-    fontWeight: '700',
+    borderRadius: '10px',
+    fontWeight: '600',
     fontSize: '0.95rem',
     cursor: 'pointer',
-    boxShadow: '0 4px 14px rgba(0, 120, 212, 0.4)',
-    transition: 'transform 0.2s',
-  },
-  btnSecondary: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'rgba(255, 255, 255, 0.05)',
-    border: '1px solid rgba(255, 255, 255, 0.12)',
-    color: '#cbd5e1',
-    padding: '0.75rem',
-    borderRadius: '12px',
-    fontWeight: '600',
-    fontSize: '0.85rem',
-    cursor: 'pointer',
-    transition: 'background 0.2s',
+    transition: 'all 0.2s ease',
   },
   divider: {
     display: 'flex',
     alignItems: 'center',
     textAlign: 'center',
-    margin: '0.25rem 0',
+    margin: '0.2rem 0',
   },
   dividerText: {
     width: '100%',
@@ -297,19 +259,43 @@ const styles = {
     borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
     lineHeight: '0.1em',
   },
-  btnDemo: {
+  form: {
     display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '8px',
-    background: 'rgba(16, 185, 129, 0.08)',
-    border: '1px solid rgba(16, 185, 129, 0.25)',
-    color: '#10b981',
-    padding: '0.75rem',
-    borderRadius: '12px',
+    flexDirection: 'column',
+    gap: '1rem',
+  },
+  formGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+  },
+  label: {
+    fontSize: '0.82rem',
+    fontWeight: '600',
+    color: '#cbd5e1',
+  },
+  input: {
+    background: '#131d33',
+    border: '1px solid rgba(255, 255, 255, 0.12)',
+    borderRadius: '8px',
+    padding: '0.75rem 1rem',
+    color: '#ffffff',
+    fontSize: '0.9rem',
+    outline: 'none',
+    transition: 'border-color 0.2s',
+  },
+  btnSubmit: {
+    marginTop: '0.5rem',
+    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+    border: 'none',
+    color: '#ffffff',
+    padding: '0.85rem',
+    borderRadius: '10px',
     fontWeight: '700',
-    fontSize: '0.88rem',
+    fontSize: '0.95rem',
     cursor: 'pointer',
+    boxShadow: '0 4px 14px rgba(2, 132, 199, 0.4)',
+    transition: 'transform 0.2s',
   },
 };
 

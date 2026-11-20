@@ -1,25 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { getApiEndpoints } from '../config/apiConfig';
+import { pagoService } from '../services/pagoService';
 import { ShieldCheckIcon, CheckIcon, CloseIcon } from './Icons';
 
 /**
- * Página de Retorno de Webpay Plus (/callback)
- * Valida el token_ws con ms-pago (POST /api/pagos/commit?token_ws=...),
- * mostrando estados de carga, voucher oficial aprobado, o rechazo/bloqueo antifraude.
+ * Página de Retorno Oficial de Transbank Webpay Plus (/callback)
+ * Consume el servicio pagoService.confirmarPago(token_ws),
+ * manejando estados de loading, voucher aprobado, rechazo bancario y alertas antifraude (HTTP 429).
  */
 export const WebpayCallbackPage = ({ token, onReturnHome, onReturnCloudOps }) => {
   const [loading, setLoading] = useState(true);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
-  const endpoints = getApiEndpoints();
 
   useEffect(() => {
     const commitPayment = async () => {
       setLoading(true);
       setError(null);
 
-      // Si no hay token en el callback
-      const activeToken = token || new URLSearchParams(window.location.search).get('token_ws');
+      // Extraer token_ws desde prop o desde URL query params
+      let activeToken = token;
+      if (!activeToken && typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        activeToken = params.get('token_ws') || params.get('token');
+      }
 
       if (!activeToken) {
         setError({
@@ -31,27 +34,9 @@ export const WebpayCallbackPage = ({ token, onReturnHome, onReturnCloudOps }) =>
       }
 
       try {
-        const commitUrl = `${endpoints.pagosCommit}?token_ws=${encodeURIComponent(activeToken)}`;
-        const res = await fetch(commitUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token_ws: activeToken }),
-        });
+        const data = await pagoService.confirmarPago(activeToken);
 
-        if (res.status === 429) {
-          const fraudData = await res.json().catch(() => ({}));
-          setError({
-            status: 'BLOQUEO_FRAUDE_429',
-            message: fraudData.mensaje || 'Transacción denegada por protocolo de seguridad antifraude (ráfagas de intentos sospechosos).',
-            detail: 'Se ha impuesto un bloqueo temporal de 30 minutos a la cuenta o IP de origen.',
-          });
-          setLoading(false);
-          return;
-        }
-
-        const data = await res.json();
-
-        if (res.ok && (data.success || data.status === 'AUTHORIZED' || data.response_code === 0)) {
+        if (data.success || data.status === 'AUTHORIZED' || data.response_code === 0) {
           setResult({
             success: true,
             buyOrder: data.buyOrder || data.buy_order || `OC-${Date.now().toString().slice(-6)}`,
@@ -71,11 +56,19 @@ export const WebpayCallbackPage = ({ token, onReturnHome, onReturnCloudOps }) =>
           });
         }
       } catch (err) {
-        setError({
-          status: 'NETWORK_ERROR',
-          message: 'Error de comunicación con el microservicio de Pagos (:8085).',
-          detail: err.message,
-        });
+        if (err.status === 429) {
+          setError({
+            status: 'BLOQUEO_FRAUDE_429',
+            message: err.message || 'Transacción denegada por protocolo de seguridad antifraude (ráfagas sospechosas).',
+            detail: 'Se ha impuesto un bloqueo temporal de 30 minutos a la cuenta de origen.',
+          });
+        } else {
+          setError({
+            status: 'NETWORK_ERROR',
+            message: 'Error de comunicación con el microservicio de Pagos.',
+            detail: err.message,
+          });
+        }
       } finally {
         setLoading(false);
       }
@@ -93,7 +86,7 @@ export const WebpayCallbackPage = ({ token, onReturnHome, onReturnCloudOps }) =>
             <div style={cbStyles.spinner}></div>
             <h3 style={cbStyles.title}>Confirmando Pago con Webpay Plus...</h3>
             <p style={cbStyles.subtitle}>
-              Validando firma criptográfica de Transbank y asentando evento transaccional en RabbitMQ y Kafka.
+              Validando firma criptográfica de Transbank y asentando evento transaccional en el clúster.
             </p>
           </div>
         )}

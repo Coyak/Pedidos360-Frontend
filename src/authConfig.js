@@ -1,15 +1,26 @@
 import { LogLevel } from "@azure/msal-browser";
 
 /**
- * Configuración principal de MSAL (Microsoft Authentication Library)
+ * Configuración de Microsoft Authentication Library (MSAL)
  * para integración con Microsoft Entra ID (Azure AD).
+ * Parametrizado mediante variables de entorno VITE_* sin localhost hardcodeado.
  */
+const clientId = import.meta.env?.VITE_AZURE_CLIENT_ID || "5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4";
+const tenantId = import.meta.env?.VITE_AZURE_TENANT_ID || "e5372bf0-c5e3-4286-887c-79069f209c1f";
+
+const getOriginUri = () => {
+  if (typeof window !== 'undefined' && window.location.origin) {
+    return window.location.origin;
+  }
+  return "";
+};
+
 export const msalConfig = {
   auth: {
-    clientId: "5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4", 
-    authority: "https://login.microsoftonline.com/e5372bf0-c5e3-4286-887c-79069f209c1f", // Tenant ID de Pedidos360
-    redirectUri: typeof window !== 'undefined' ? (window.location.origin + window.location.pathname) : "http://localhost:5173",
-    postLogoutRedirectUri: typeof window !== 'undefined' ? (window.location.origin + window.location.pathname) : "http://localhost:5173",
+    clientId: clientId,
+    authority: `https://login.microsoftonline.com/${tenantId}`,
+    redirectUri: import.meta.env?.VITE_AZURE_REDIRECT_URI || getOriginUri(),
+    postLogoutRedirectUri: import.meta.env?.VITE_AZURE_REDIRECT_URI || getOriginUri(),
     navigateToLoginRequestUrl: true,
   },
   cache: {
@@ -28,16 +39,12 @@ export const msalConfig = {
   },
 };
 
-/**
- * Scopes estándar requeridos para inicio de sesión en Azure Entra ID (guía docente)
- */
 export const loginRequest = {
   scopes: ["User.Read", "openid", "profile", "email"],
 };
 
-/**
- * Scopes requeridos para invocar las APIs protegidas del backend en AWS
- */
 export const apiRequest = {
-  scopes: ["openid", "profile", "email", "api://5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4/.default"],
+  scopes: ["openid", "profile", "email", `api://${clientId}/.default`],
 };
+
+export default msalConfig;

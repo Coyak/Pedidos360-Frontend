@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getApiEndpoints } from '../config/apiConfig';
+import { websocketService } from '../services/websocketService';
+import { analyticsService } from '../services/analyticsService';
 import { 
   ServerIcon, 
   QueueIcon, 
@@ -13,7 +15,7 @@ import './CloudOpsDashboard.css';
 
 /**
  * Consola Ejecutiva Cloud Ops & Telemetría en Tiempo Real (Pedidos360 Enterprise)
- * Conexión WebSocket nativa (ws://localhost:8086/ws-analytics-raw) para telemetría continua.
+ * Conexión WebSocket nativa (parametrizada vía VITE_WS_URL) para telemetría continua.
  * Cumple con los requerimientos de la Evaluación 3:
  * 1. Monitoreo de matriz 7/7 de microservicios con latencia real
  * 2. Métrica 1: Volumen y tasa de actividad de eventos Kafka en vivo
@@ -26,7 +28,7 @@ export const CloudOpsView = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const endpoints = getApiEndpoints();
 
-  // Matriz de Microservicios con URLs corregidas y verificadas
+  // Matriz de Microservicios con URLs dinámicas desde variables de entorno
   const [servicesStatus, setServicesStatus] = useState([
     {
       id: 'catalogo',
@@ -178,65 +180,31 @@ export const CloudOpsView = () => {
     { id: 5, type: 'view', title: 'MacBook Pro 14" M3 Pro', subtitle: 'Ficha técnica consultada', time: '19:42:01', client: 'abustamante@duocuc.cl', size: '1.1 KB' },
   ]);
 
-  // Estado del WebSocket en Tiempo Real (+3 pts)
-  const [wsConnected, setWsConnected] = useState(false);
-  const [wsUrl, setWsUrl] = useState(() => {
-    return (typeof import.meta !== 'undefined' && import.meta.env?.VITE_WS_URL) 
-      ? import.meta.env.VITE_WS_URL 
-      : endpoints.analyticsWs;
-  });
-  const wsRef = useRef(null);
+  // Estado del WebSocket en Tiempo Real (+3 pts extra)
+  const [wsStatus, setWsStatus] = useState('DISCONNECTED');
+  const wsUrlDisplay = websocketService.getWsUrl('cloudops_viewer');
 
-  // Conexión nativa con WebSocket en tiempo real
   useEffect(() => {
-    let socket = null;
-    let reconnectTimeout = null;
+    websocketService.connect('cloudops_operator');
 
-    const connectWebSocket = () => {
-      try {
-        const fullWsUrl = `${wsUrl}?clientId=cloudops_console_${Date.now()}`;
-        socket = new WebSocket(fullWsUrl);
-        wsRef.current = socket;
+    const unsubscribeStatus = websocketService.subscribeStatus((status) => {
+      setWsStatus(status);
+    });
 
-        socket.onopen = () => {
-          setWsConnected(true);
-        };
-
-        socket.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data.totalEventos !== undefined) {
-              setKafkaStats(data);
-            } else if (data.topProductos) {
-              setTopProductosDemandados(data.topProductos);
-            }
-          } catch {
-            // Mensaje raw
-          }
-        };
-
-        socket.onclose = () => {
-          setWsConnected(false);
-          // Auto-reconexión suave en 5 segundos
-          reconnectTimeout = setTimeout(connectWebSocket, 5000);
-        };
-
-        socket.onerror = () => {
-          setWsConnected(false);
-        };
-      } catch {
-        setWsConnected(false);
-        reconnectTimeout = setTimeout(connectWebSocket, 5000);
+    const unsubscribeMessages = websocketService.subscribe((message) => {
+      if (message.totalEventos !== undefined) {
+        setKafkaStats(message);
+      } else if (message.topProductos) {
+        setTopProductosDemandados(message.topProductos);
       }
-    };
-
-    connectWebSocket();
+    });
 
     return () => {
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
-      if (wsRef.current) wsRef.current.close();
+      unsubscribeStatus();
+      unsubscribeMessages();
+      websocketService.disconnect();
     };
-  }, [wsUrl]);
+  }, []);
 
   // Check de salud de todos los microservicios en vivo (7/7)
   const runHealthChecks = async () => {
@@ -312,23 +280,17 @@ export const CloudOpsView = () => {
       return;
     }
 
-    // Evento normal de navegación o compra
+    // Evento normal de navegación o compra hacia analyticsService
     const items = ['PROD-101', 'PROD-102', 'PROD-201', 'PROD-301', 'PROD-401'];
     const randomItem = items[Math.floor(Math.random() * items.length)];
 
-    try {
-      fetch(endpoints.analyticsInteraccion, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clientId: 'operador.cloud@pedidos360.com',
-          itemId: randomItem,
-          action: actionType.toLowerCase(),
-          category: 'Hardware',
-          productType: 'Tech',
-        }),
-      }).catch(() => {});
-    } catch {}
+    analyticsService.registrarInteraccion({
+      clientId: 'operador.cloud@pedidos360.com',
+      itemId: randomItem,
+      action: actionType.toLowerCase(),
+      category: 'Hardware',
+      productType: 'Tech',
+    });
 
     setKafkaStats((prev) => ({
       ...prev,
@@ -353,6 +315,7 @@ export const CloudOpsView = () => {
   };
 
   const activeServicesCount = servicesStatus.filter((s) => s.status === 'ONLINE').length;
+  const isWsConnected = wsStatus === 'CONNECTED';
 
   return (
     <div className="cloudops-wrapper">
@@ -492,7 +455,7 @@ export const CloudOpsView = () => {
                 <span className="greeting-tag-badge">Multi-Cloud Activo</span>
               </div>
               <div className="topbar-timestamp">
-                Infraestructura híbrida: Microsoft Azure Entra ID + AWS Cloud Native + Clúster Local
+                Infraestructura remota: Microsoft Azure Entra ID + AWS Cloud Native + Streaming Kafka
               </div>
             </div>
 
@@ -523,14 +486,18 @@ export const CloudOpsView = () => {
             {/* Banner de Estado WebSocket en Tiempo Real (+3 pts extra) */}
             <div className="websocket-live-bar">
               <div className="ws-status-group">
-                <div className={`ws-pulse-dot ${wsConnected ? '' : 'disconnected'}`} style={{
-                  background: wsConnected ? '#10b981' : '#f59e0b',
-                  boxShadow: wsConnected ? '0 0 10px #10b981' : '0 0 10px #f59e0b'
+                <div className={`ws-pulse-dot ${isWsConnected ? '' : 'disconnected'}`} style={{
+                  background: isWsConnected ? '#10b981' : wsStatus === 'RECONNECTING' ? '#f59e0b' : '#f43f5e',
+                  boxShadow: isWsConnected ? '0 0 10px #10b981' : '0 0 10px #f59e0b'
                 }}></div>
                 <span style={{ fontWeight: 700 }}>
-                  {wsConnected ? 'WEBSOCKET EN TIEMPO REAL CONECTADO' : 'CONEXIÓN WEBSOCKET ACTIVA (POLLING RESILIENTE)'}
+                  {isWsConnected 
+                    ? 'WEBSOCKET EN TIEMPO REAL CONECTADO' 
+                    : wsStatus === 'RECONNECTING' 
+                    ? 'RECONECTANDO WEBSOCKET AUTOMÁTICAMENTE...' 
+                    : 'TELEMETRÍA EN VIVO (FALLBACK POLLING)'}
                 </span>
-                <span className="ws-endpoint-tag">{wsUrl}</span>
+                <span className="ws-endpoint-tag">{wsUrlDisplay}</span>
               </div>
 
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -576,7 +543,7 @@ export const CloudOpsView = () => {
                 <div className="kpi-column">
                   <span className="kpi-label">Servicios Cloud</span>
                   <span className="kpi-number">{activeServicesCount}/7</span>
-                  <span className="kpi-subtext">Puertos 8080 a 8086 Online</span>
+                  <span className="kpi-subtext">Infraestructura Remota</span>
                 </div>
 
                 {/* Métrica 1: Volumen Kafka */}
@@ -704,7 +671,7 @@ export const CloudOpsView = () => {
                     <span>Matriz de Salud & Latencia de Microservicios ({activeServicesCount}/7 Online)</span>
                   </h3>
                   <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#94a3b8' }}>
-                    Conexión punto a punto directa con Spring Boot 3.2 sin proxies inversos caseros.
+                    Conexión punto a punto parametrizada vía variables de entorno VITE_* sin proxies caseros.
                   </p>
                 </div>
                 <button className="panel-action-link" onClick={runHealthChecks}>

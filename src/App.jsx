@@ -6,7 +6,7 @@ import Carrito from './components/Carrito';
 import OrderSuccessModal from './components/OrderSuccessModal';
 import MisComprasModal from './components/MisComprasModal';
 import WebpayModal from './components/WebpayModal';
-import ProductDetailModal from './components/ProductDetailModal';
+import ProductDetailPage from './components/ProductDetailPage';
 import CloudOpsView from './components/CloudOpsView';
 import { SearchIcon, CartIcon, CloseIcon, CloudIcon, QueueIcon, ShieldCheckIcon } from './components/Icons';
 import './App.css';
@@ -75,25 +75,47 @@ function App() {
     }
   }, []);
 
-  // Vistas principales: 'store' (Tienda) o 'cloudops' (Cloud Ops & Telemetría)
-  const [activeMainView, setActiveMainView] = useState('store');
+  // Sincronización de Rutas con window.location (Hash Routing nativo: #/, #/producto/:id, #/cloudops)
+  const parseCurrentRoute = () => {
+    if (typeof window === 'undefined') return { view: 'home', param: null };
+    const hash = window.location.hash || '#/';
+    if (hash.startsWith('#/producto/')) {
+      return { view: 'product', param: hash.replace('#/producto/', '') };
+    }
+    if (hash === '#/cloudops') {
+      return { view: 'cloudops', param: null };
+    }
+    return { view: 'home', param: null };
+  };
+
+  const [currentRoute, setCurrentRoute] = useState(parseCurrentRoute());
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      setCurrentRoute(parseCurrentRoute());
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  // Función unificada de navegación
+  const navigateTo = (view, param = null) => {
+    if (view === 'home') {
+      window.location.hash = '#/';
+      if (param) setSelectedCategory(param);
+    } else if (view === 'product') {
+      window.location.hash = `#/producto/${param}`;
+    } else if (view === 'cloudops') {
+      window.location.hash = '#/cloudops';
+    }
+  };
 
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [searchTerm, setSearchTerm] = useState('');
   const [refreshStockCounter, setRefreshStockCounter] = useState(0);
 
-  // Modal de Detalle de Producto
-  const [selectedProductForDetail, setSelectedProductForDetail] = useState(null);
-
-  const [cartItems, setCartItems] = useState([
-    {
-      id: "PROD-101",
-      name: "Laptop Asus ROG Strix G16",
-      price: 1290000,
-      quantity: 1,
-      image: "https://images.unsplash.com/photo-1603302576837-37561b2e2302?auto=format&fit=crop&w=600&q=80",
-    }
-  ]);
+  // Carrito vacío por defecto (sin productos pre-agregados)
+  const [cartItems, setCartItems] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isComprasOpen, setIsComprasOpen] = useState(false);
   const [webpayCheckoutData, setWebpayCheckoutData] = useState(null);
@@ -106,6 +128,10 @@ function App() {
     } catch {}
     if (instance && typeof instance.logoutPopup === 'function') {
       instance.logoutPopup().catch(() => {});
+    }
+    // Si estaba en la vista de Cloud Ops y se deslogea, volver a la tienda
+    if (currentRoute.view === 'cloudops') {
+      navigateTo('home');
     }
   };
 
@@ -168,7 +194,7 @@ function App() {
           <div 
             className="logo-container" 
             onClick={() => { 
-              setActiveMainView('store');
+              navigateTo('home');
               setSelectedCategory('Todos'); 
               setSearchTerm(''); 
             }} 
@@ -181,27 +207,31 @@ function App() {
             </div>
           </div>
 
-          {/* Switch de Vistas: Tienda vs Cloud Ops */}
+          {/* Switch de Vistas: Solo muestra Cloud Ops si el usuario está autenticado */}
           <nav className="header-nav-switcher">
             <button
-              className={`nav-tab-btn ${activeMainView === 'store' ? 'active' : ''}`}
-              onClick={() => setActiveMainView('store')}
+              className={`nav-tab-btn ${currentRoute.view === 'home' || currentRoute.view === 'product' ? 'active' : ''}`}
+              onClick={() => navigateTo('home')}
             >
               <span>🛍️</span>
               <span>Tienda Online</span>
             </button>
-            <button
-              className={`nav-tab-btn ${activeMainView === 'cloudops' ? 'active' : ''}`}
-              onClick={() => setActiveMainView('cloudops')}
-            >
-              <span className="live-dot-green"></span>
-              <span>⚡ Cloud Ops & Telemetría</span>
-            </button>
+
+            {activeAccount && (
+              <button
+                className={`nav-tab-btn ${currentRoute.view === 'cloudops' ? 'active' : ''}`}
+                onClick={() => navigateTo('cloudops')}
+                title="Consola técnica disponible para usuarios autenticados"
+              >
+                <span className="live-dot-green"></span>
+                <span>⚡ Cloud Ops & Telemetría</span>
+              </button>
+            )}
           </nav>
         </div>
 
-        {/* Buscador Central (Solo visible en la Tienda) */}
-        {activeMainView === 'store' && (
+        {/* Buscador Central (Solo visible en la vista de Catálogo Tienda) */}
+        {currentRoute.view === 'home' && (
           <div className="header-center">
             <div className="search-bar-wrapper">
               <span className="search-icon">
@@ -210,7 +240,7 @@ function App() {
               <input
                 type="text"
                 className="search-input"
-                placeholder="Buscar laptops, periféricos, monitores, audio..."
+                placeholder="Buscar laptops gamer, periféricos, monitores, audio..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -278,14 +308,40 @@ function App() {
         </div>
       </header>
 
-      {/* 2. Renderizado Condicional de la Vista Principal */}
-      {activeMainView === 'cloudops' ? (
+      {/* 2. Ruteo de Vistas */}
+
+      {/* RUTA 1: Centro Cloud Ops & Telemetría (#/cloudops) */}
+      {currentRoute.view === 'cloudops' && (
         <main className="app-main">
-          <CloudOpsView />
+          {activeAccount ? (
+            <CloudOpsView />
+          ) : (
+            <div style={{ textAlign: 'center', padding: '5rem 1rem' }}>
+              <h3>Acceso Restringido</h3>
+              <p style={{ color: '#94a3b8' }}>Debes iniciar sesión con tu cuenta corporativa para acceder al centro de operaciones.</p>
+              <button className="btn btn-primary" onClick={() => navigateTo('home')} style={{ marginTop: '1rem' }}>
+                Volver a la Tienda
+              </button>
+            </div>
+          )}
         </main>
-      ) : (
+      )}
+
+      {/* RUTA 2: Página Dedicada de Producto (#/producto/:id) */}
+      {currentRoute.view === 'product' && (
+        <main className="app-main">
+          <ProductDetailPage
+            productId={currentRoute.param}
+            onNavigate={navigateTo}
+            onAddToCart={handleAddToCart}
+            cartItems={cartItems}
+          />
+        </main>
+      )}
+
+      {/* RUTA 3: Tienda y Catálogo General (#/ o ruta por defecto) */}
+      {currentRoute.view === 'home' && (
         <>
-          {/* Hero Section Corporativo y Elegante */}
           <section className="store-hero">
             <div className="hero-content">
               <div className="hero-pill">
@@ -313,7 +369,6 @@ function App() {
             </div>
           </section>
 
-          {/* Catálogo Principal */}
           <main className="app-main">
             <Catalogo
               selectedCategory={selectedCategory}
@@ -322,23 +377,13 @@ function App() {
               onAddToCart={handleAddToCart}
               cartItems={cartItems}
               refreshTrigger={refreshStockCounter}
-              onOpenProductDetail={(product) => setSelectedProductForDetail(product)}
+              onOpenProductDetail={(product) => navigateTo('product', product.id)}
             />
           </main>
         </>
       )}
 
-      {/* 3. Modal de Ficha Técnica y Detalle del Producto (con Recomendaciones) */}
-      <ProductDetailModal
-        product={selectedProductForDetail}
-        isOpen={!!selectedProductForDetail}
-        onClose={() => setSelectedProductForDetail(null)}
-        onAddToCart={handleAddToCart}
-        cartItems={cartItems}
-        onSelectProduct={(newProduct) => setSelectedProductForDetail(newProduct)}
-      />
-
-      {/* 4. Carrito de Compras (Drawer lateral) */}
+      {/* 3. Carrito de Compras (Drawer lateral) */}
       <Carrito
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
@@ -354,7 +399,7 @@ function App() {
         activeAccount={activeAccount}
       />
 
-      {/* 5. Modal de Pagos con Webpay Plus y Detección Antifraude */}
+      {/* 4. Modal de Pagos con Webpay Plus y Detección Antifraude */}
       <WebpayModal
         isOpen={!!webpayCheckoutData}
         onClose={() => setWebpayCheckoutData(null)}
@@ -377,25 +422,25 @@ function App() {
         }}
       />
 
-      {/* 6. Modal de Confirmación de Pedido */}
+      {/* 5. Modal de Confirmación de Pedido */}
       <OrderSuccessModal
         orderData={completedOrderData}
         onClose={() => setCompletedOrderData(null)}
       />
 
-      {/* 7. Modal de Mis Compras Recientes (Auditoría SHA-256) */}
+      {/* 6. Modal de Mis Compras Recientes (Auditoría SHA-256) */}
       <MisComprasModal
         isOpen={isComprasOpen}
         onClose={() => setIsComprasOpen(false)}
         activeAccount={activeAccount}
       />
 
-      {/* 8. Footer Corporativo */}
+      {/* 7. Footer Corporativo */}
       <footer className="app-footer">
         <div className="footer-content">
           <p>© 2026 Pedidos360 Enterprise • Arquitectura Cloud Native & Streaming</p>
           <div className="footer-links">
-            <span>Perímetro: <code>AWS Native (Direct Multi-Port Architecture)</code></span>
+            <span>Perímetro: <code>AWS Native Multi-Port Architecture</code></span>
           </div>
         </div>
       </footer>

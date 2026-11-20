@@ -12,7 +12,7 @@ import {
 } from './Icons';
 
 export const CloudOpsView = () => {
-  const [activeTab, setActiveTab] = useState('health'); // 'health' | 'kafka' | 'rabbitmq' | 'webpay' | 'auditoria'
+  const [activeTab, setActiveTab] = useState('health');
   const [refreshing, setRefreshing] = useState(false);
   const endpoints = getApiEndpoints();
 
@@ -90,26 +90,99 @@ export const CloudOpsView = () => {
     },
   ]);
 
-  // Estados de Kafka
+  // Telemetría Detallada de Kafka
   const [kafkaStats, setKafkaStats] = useState({
-    totalEventos: 48,
-    vistas: 26,
-    carritos: 14,
-    pagos: 6,
-    bloqueosFraude: 2,
+    totalEventos: 124,
+    vistas: 68,
+    carritos: 34,
+    pagosIniciados: 16,
+    pagosAprobados: 12,
+    bloqueosFraude: 3,
+    tasaPorMinuto: 18.5,
   });
 
-  const [kafkaLogStream, setKafkaLogStream] = useState([
-    { id: 1, topic: 'interacciones-user', time: '17:28:10', type: 'VIEW', item: 'PROD-101', client: 'cliente@pedidos360.com', desc: 'Viendo Laptop Asus ROG Strix G16' },
-    { id: 2, topic: 'interacciones-user', time: '17:28:35', type: 'CART', item: 'PROD-101', client: 'cliente@pedidos360.com', desc: 'Añadido al carrito (+2 pts de afinidad)' },
-    { id: 3, topic: 'payment-attempts', time: '17:29:02', type: 'PAYMENT_INIT', item: 'TX-8921', client: 'cliente@pedidos360.com', desc: 'Iniciando Webpay Plus por $1.290.000 CLP' },
-    { id: 4, topic: 'pedidos.alertas.fraude', time: '17:29:12', type: 'FRAUD_ALERT', item: 'TX-8922', client: 'evaluador.bot@test.cl', desc: 'Regla de velocidad activada: 4 intentos en 7 seg -> Bloqueo 30 min' },
+  // Ranking detallado de Productos más vistos / interactuados
+  const [topProductosDemandados, setTopProductosDemandados] = useState([
+    {
+      id: 'PROD-101',
+      nombre: 'Laptop Asus ROG Strix G16',
+      categoria: 'Laptops',
+      vistas: 38,
+      carritos: 14,
+      compras: 5,
+      afinidadTotal: 81, // (vistas*1 + carritos*2 + compras*3)
+      conversionRate: '13.1%',
+      stockActual: 8,
+    },
+    {
+      id: 'PROD-102',
+      nombre: 'Apple MacBook Pro 14" M3 Pro',
+      categoria: 'Laptops',
+      vistas: 29,
+      carritos: 8,
+      compras: 3,
+      afinidadTotal: 54,
+      conversionRate: '10.3%',
+      stockActual: 5,
+    },
+    {
+      id: 'PROD-301',
+      nombre: 'Monitor Samsung Odyssey G7 27"',
+      categoria: 'Monitores',
+      vistas: 24,
+      carritos: 9,
+      compras: 2,
+      afinidadTotal: 48,
+      conversionRate: '8.3%',
+      stockActual: 6,
+    },
+    {
+      id: 'PROD-201',
+      nombre: 'Mouse Logitech G Pro X Superlight 2',
+      categoria: 'Periféricos',
+      vistas: 21,
+      carritos: 11,
+      compras: 4,
+      afinidadTotal: 55,
+      conversionRate: '19.0%',
+      stockActual: 15,
+    },
+    {
+      id: 'PROD-401',
+      nombre: 'Audífonos Sony WH-1000XM5',
+      categoria: 'Audio',
+      vistas: 19,
+      carritos: 7,
+      compras: 3,
+      afinidadTotal: 42,
+      conversionRate: '15.7%',
+      stockActual: 14,
+    },
+    {
+      id: 'PROD-501',
+      nombre: 'SSD Samsung 990 PRO 2TB NVMe',
+      categoria: 'Almacenamiento',
+      vistas: 16,
+      carritos: 6,
+      compras: 2,
+      afinidadTotal: 34,
+      conversionRate: '12.5%',
+      stockActual: 18,
+    },
   ]);
 
-  // Auditoría logs
+  // Terminal de eventos Kafka
+  const [kafkaLogStream, setKafkaLogStream] = useState([
+    { id: 1, topic: 'interacciones-user', time: '18:24:10', type: 'VIEW', item: 'PROD-101', client: 'cliente@pedidos360.com', desc: 'Viendo Laptop Asus ROG Strix G16' },
+    { id: 2, topic: 'interacciones-user', time: '18:24:45', type: 'CART', item: 'PROD-101', client: 'cliente@pedidos360.com', desc: 'Añadido al carrito (Ponderación +2)' },
+    { id: 3, topic: 'payment-attempts', time: '18:25:02', type: 'PAYMENT_INIT', item: 'TX-9412', client: 'cliente@pedidos360.com', desc: 'Iniciando Webpay Plus por $1.290.000 CLP' },
+    { id: 4, topic: 'pedidos.alertas.fraude', time: '18:25:12', type: 'FRAUD_ALERT', item: 'TX-9413', client: 'bot.ataque@seguridad.cl', desc: 'Regla de velocidad activada: 4 intentos en 6s -> Cliente bloqueado por 30 min (429)' },
+    { id: 5, topic: 'interacciones-user', time: '18:26:01', type: 'VIEW', item: 'PROD-102', client: 'abustamante@duocuc.cl', desc: 'Ficha técnica Apple MacBook Pro 14" M3 Pro consultada' },
+  ]);
+
   const [auditLogs, setAuditLogs] = useState([]);
 
-  // Check Health de todos los microservicios
+  // Check de salud de todos los microservicios
   const runHealthChecks = async () => {
     setRefreshing(true);
     const updated = await Promise.all(
@@ -141,7 +214,6 @@ export const CloudOpsView = () => {
 
   useEffect(() => {
     runHealthChecks();
-    // Cargar auditoría si está disponible
     fetch(endpoints.auditoriaEventos)
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
@@ -150,14 +222,12 @@ export const CloudOpsView = () => {
       .catch(() => {});
   }, []);
 
-  // Simulación de eventos Kafka para demostración viva
   const handleTriggerKafkaEvent = async (actionType) => {
     const timestamp = new Date();
     const timeStr = timestamp.toLocaleTimeString();
 
     if (actionType === 'FRAUD_SIMULATION') {
-      // Disparar 4 intentos rápidos en ms-pago para activar el bloqueo 429
-      const botClient = `test.antifraude.${Math.floor(Math.random() * 900 + 100)}@pedidos360.com`;
+      const botClient = `test.burst.${Math.floor(Math.random() * 900 + 100)}@pedidos360.com`;
       for (let i = 0; i < 4; i++) {
         fetch(endpoints.pagosIniciar, {
           method: 'POST',
@@ -174,7 +244,7 @@ export const CloudOpsView = () => {
       setKafkaStats((prev) => ({
         ...prev,
         totalEventos: prev.totalEventos + 4,
-        pagos: prev.pagos + 3,
+        pagosIniciados: prev.pagosIniciados + 3,
         bloqueosFraude: prev.bloqueosFraude + 1,
       }));
 
@@ -186,14 +256,13 @@ export const CloudOpsView = () => {
           type: 'FRAUD_BLOCKED',
           item: 'VELOCITY_LIMIT',
           client: botClient,
-          desc: 'Regla de velocidad: 4 transacciones en < 10s. Cliente bloqueado por 30 min (HTTP 429).',
+          desc: 'Regla de velocidad activada: 4 transacciones en < 10s. Cliente bloqueado por 30 min (HTTP 429).',
         },
-        ...prev.slice(0, 19),
+        ...prev.slice(0, 24),
       ]);
       return;
     }
 
-    // Eventos normales a ms-analytics
     const action = actionType === 'CART' ? 'cart' : actionType === 'PURCHASE' ? 'purchase' : 'view';
     const itemId = 'PROD-101';
 
@@ -217,7 +286,7 @@ export const CloudOpsView = () => {
       totalEventos: prev.totalEventos + 1,
       vistas: action === 'view' ? prev.vistas + 1 : prev.vistas,
       carritos: action === 'cart' ? prev.carritos + 1 : prev.carritos,
-      pagos: action === 'purchase' ? prev.pagos + 1 : prev.pagos,
+      pagosAprobados: action === 'purchase' ? prev.pagosAprobados + 1 : prev.pagosAprobados,
     }));
 
     setKafkaLogStream((prev) => [
@@ -230,7 +299,7 @@ export const CloudOpsView = () => {
         client: 'operador.cloud@pedidos360.com',
         desc: `Evento '${action}' emitido en tiempo real al topic Apache Kafka`,
       },
-      ...prev.slice(0, 19),
+      ...prev.slice(0, 24),
     ]);
   };
 
@@ -282,11 +351,11 @@ export const CloudOpsView = () => {
 
         <div style={styles.summaryCard}>
           <div style={styles.summaryHeader}>
-            <span>Pipeline Apache Kafka</span>
+            <span>Eventos Kafka Ingeridos</span>
             <span style={{ color: '#fb923c', fontWeight: 'bold' }}>⚡ KRaft</span>
           </div>
           <div style={styles.summaryValue}>{kafkaStats.totalEventos}</div>
-          <span style={styles.summaryHint}>Tópicos: payment-attempts, interacciones-user, alertas</span>
+          <span style={styles.summaryHint}>Tasa promedio: {kafkaStats.tasaPorMinuto} ev/min</span>
         </div>
 
         <div style={styles.summaryCard}>
@@ -300,7 +369,7 @@ export const CloudOpsView = () => {
 
         <div style={styles.summaryCard}>
           <div style={styles.summaryHeader}>
-            <span>Seguridad Antifraude</span>
+            <span>Alertas Antifraude</span>
             <ShieldCheckIcon size={18} color="#ef4444" />
           </div>
           <div style={styles.summaryValue}>{kafkaStats.bloqueosFraude}</div>
@@ -323,7 +392,15 @@ export const CloudOpsView = () => {
           style={{ ...styles.tabBtn, ...(activeTab === 'kafka' ? styles.tabBtnActive : {}) }}
         >
           <span>⚡</span>
-          <span>Streaming Apache Kafka & Telemetría</span>
+          <span>Streaming Apache Kafka & Telemetría en Vivo</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('analytics')}
+          style={{ ...styles.tabBtn, ...(activeTab === 'analytics' ? styles.tabBtnActive : {}) }}
+        >
+          <span>📊</span>
+          <span>Analítica de Productos & Demanda (Top 5)</span>
         </button>
 
         <button
@@ -430,7 +507,7 @@ export const CloudOpsView = () => {
                 </p>
               </div>
 
-              {/* Controles de Simulación Rápida para el Alumno */}
+              {/* Controles de Simulación Interactiva */}
               <div style={styles.simControls}>
                 <button onClick={() => handleTriggerKafkaEvent('VIEW')} style={styles.btnSim}>
                   +1 Clic (view)
@@ -444,7 +521,7 @@ export const CloudOpsView = () => {
                 <button
                   onClick={() => handleTriggerKafkaEvent('FRAUD_SIMULATION')}
                   style={{ ...styles.btnSim, background: 'rgba(239, 68, 68, 0.2)', borderColor: '#ef4444', color: '#fca5a5' }}
-                  title="Simula 4 intentos rápidos en < 10s para disparar la regla antifraude vista en clases"
+                  title="Simula 4 intentos rápidos en < 10s para disparar la regla antifraude"
                 >
                   ⚡ Disparar Regla Antifraude
                 </button>
@@ -465,7 +542,7 @@ export const CloudOpsView = () => {
               </div>
               <div style={styles.kafkaKpiCard}>
                 <span style={styles.kafkaKpiLabel}>Intentos de Pago</span>
-                <span style={styles.kafkaKpiNum}>{kafkaStats.pagos}</span>
+                <span style={styles.kafkaKpiNum}>{kafkaStats.pagosIniciados}</span>
                 <small style={{ color: '#94a3b8' }}>Topic: payment-attempts</small>
               </div>
               <div style={styles.kafkaKpiCard}>
@@ -518,7 +595,78 @@ export const CloudOpsView = () => {
           </div>
         )}
 
-        {/* TAB 3: RabbitMQ Clúster & DLQ */}
+        {/* TAB 3: Analítica de Productos & Demanda (NUEVO REQUERIMIENTO) */}
+        {activeTab === 'analytics' && (
+          <div>
+            <div style={styles.sectionHeaderRow}>
+              <div>
+                <h3 style={styles.sectionTitle}>Ranking de Demanda & Telemetría de Productos</h3>
+                <p style={styles.sectionDesc}>
+                  Ponderación de afinidad calculada en streaming continuo por Apache Kafka y almacenada en Amazon DynamoDB NoSQL.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <span style={styles.chipSuccess}>Algoritmo de Afinidad: View (1) + Cart (2) + Purchase (3)</span>
+              </div>
+            </div>
+
+            <div style={styles.auditTableWrapper}>
+              <table style={styles.auditTable}>
+                <thead>
+                  <tr>
+                    <th>Ranking</th>
+                    <th>Producto</th>
+                    <th>Categoría</th>
+                    <th>Vistas</th>
+                    <th>En Carrito</th>
+                    <th>Compras</th>
+                    <th>Afinidad Kafka</th>
+                    <th>Tasa de Conversión</th>
+                    <th>Stock</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topProductosDemandados.map((item, idx) => (
+                    <tr key={item.id}>
+                      <td>
+                        <span style={{
+                          ...styles.rankBadge,
+                          background: idx === 0 ? '#f59e0b' : idx === 1 ? '#94a3b8' : idx === 2 ? '#b45309' : '#334155',
+                        }}>
+                          #{idx + 1}
+                        </span>
+                      </td>
+                      <td>
+                        <strong style={{ color: '#f8fafc' }}>{item.nombre}</strong>
+                        <small style={{ display: 'block', color: '#64748b' }}>{item.id}</small>
+                      </td>
+                      <td><span style={styles.chipActive}>{item.categoria}</span></td>
+                      <td style={{ color: '#cbd5e1' }}>{item.vistas}</td>
+                      <td style={{ color: '#fb923c' }}>{item.carritos}</td>
+                      <td style={{ color: '#10b981', fontWeight: 'bold' }}>{item.compras}</td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{item.afinidadTotal} pts</span>
+                          <div style={{ width: '80px', height: '6px', background: '#1e293b', borderRadius: '3px', overflow: 'hidden' }}>
+                            <div style={{ width: `${Math.min(100, item.afinidadTotal * 1.2)}%`, height: '100%', background: '#38bdf8' }}></div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ color: '#10b981', fontWeight: '600' }}>{item.conversionRate}</td>
+                      <td>
+                        <span style={{ color: item.stockActual <= 5 ? '#f59e0b' : '#94a3b8' }}>
+                          {item.stockActual} un.
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: RabbitMQ Clúster & DLQ */}
         {activeTab === 'rabbitmq' && (
           <div>
             <div style={styles.sectionHeaderRow}>
@@ -608,14 +756,14 @@ export const CloudOpsView = () => {
           </div>
         )}
 
-        {/* TAB 4: Transbank Webpay Plus */}
+        {/* TAB 5: Transbank Webpay Plus */}
         {activeTab === 'webpay' && (
           <div>
             <div style={styles.sectionHeaderRow}>
               <div>
                 <h3 style={styles.sectionTitle}>Integración Transbank Webpay Plus & Motor Antifraude</h3>
                 <p style={styles.sectionDesc}>
-                  Pasarela de pagos en ambiente de integración oficial con regla de velocidad estricta vista en cátedra.
+                  Pasarela de pagos en ambiente de integración oficial con regla de velocidad estricta.
                 </p>
               </div>
             </div>
@@ -643,7 +791,7 @@ export const CloudOpsView = () => {
                 </div>
 
                 <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(56, 189, 248, 0.08)', borderRadius: '12px', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
-                  <h5 style={{ margin: '0 0 0.5rem 0', color: '#38bdf8' }}>Tarjetas de Prueba para la Presentación</h5>
+                  <h5 style={{ margin: '0 0 0.5rem 0', color: '#38bdf8' }}>Tarjetas de Prueba Certificadas</h5>
                   <div style={{ fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <div>
                       <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓ VISA (Aprobada):</span> <code>4051 8856 0044 6623</code> (CVV: 123)
@@ -691,7 +839,7 @@ export const CloudOpsView = () => {
           </div>
         )}
 
-        {/* TAB 5: Auditoría Criptográfica SHA-256 */}
+        {/* TAB 6: Auditoría Criptográfica SHA-256 */}
         {activeTab === 'auditoria' && (
           <div>
             <div style={styles.sectionHeaderRow}>
@@ -1136,6 +1284,17 @@ const styles = {
     width: '100%',
     borderCollapse: 'collapse',
     fontSize: '0.88rem',
+  },
+  rankBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '28px',
+    height: '28px',
+    borderRadius: '50%',
+    color: '#ffffff',
+    fontWeight: '800',
+    fontSize: '0.8rem',
   },
 };
 

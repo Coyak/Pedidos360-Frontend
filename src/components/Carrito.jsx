@@ -264,7 +264,7 @@ export const Carrito = ({
                 onClick={() => onOpenWebpay({ customerEmail, shippingAddress, totalAmount: subtotal })}
                 disabled={loadingOrder}
               >
-                💳 Pagar con Webpay Plus (+5 Pts Extra)
+                💳 Pagar con Webpay Plus
               </button>
 
               <button
@@ -281,7 +281,7 @@ export const Carrito = ({
                 onClick={handleCheckoutDirecto}
                 disabled={loadingOrder}
               >
-                {loadingOrder ? 'Procesando en RabbitMQ...' : '⚡ Simular Pedido Directo (RabbitMQ)'}
+                {loadingOrder ? 'Procesando Orden...' : '⚡ Confirmar Orden Directa'}
               </button>
             </div>
 

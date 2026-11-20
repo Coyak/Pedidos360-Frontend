@@ -28,7 +28,6 @@ export const Catalogo = ({
         if (Array.isArray(data) && data.length > 0) {
           const normalized = data.map((item) => {
             const id = item.id || `PROD-${Math.random().toString(36).substring(7).toUpperCase()}`;
-            // Buscar si existe en local para heredar specs o imágenes en alta resolución
             const localMatch = initialProducts.find((p) => p.id === id);
 
             return {
@@ -75,7 +74,6 @@ export const Catalogo = ({
 
   const handleAddToCartWithKafka = (product) => {
     onAddToCart(product);
-    // Publicar evento asíncrono a Apache Kafka
     try {
       fetch(endpoints.analyticsInteraccion, {
         method: 'POST',
@@ -163,7 +161,7 @@ export const Catalogo = ({
                 className="product-card"
                 onClick={() => handleCardClick(product)}
                 style={{ cursor: 'pointer' }}
-                title="Haz clic para ver especificaciones completas y productos recomendados"
+                title="Haz clic para ver la página dedicada de este producto"
               >
                 <div className="product-card-top">
                   <span className="product-category-tag">{product.category}</span>
@@ -182,7 +180,7 @@ export const Catalogo = ({
                     loading="lazy"
                   />
                   <div className="view-detail-hint">
-                    <span>👁️ Ver Ficha Técnica</span>
+                    <span>👁️ Ver Producto</span>
                   </div>
                 </div>
 
@@ -208,12 +206,12 @@ export const Catalogo = ({
                   <button
                     className={`btn btn-add-cart ${inCartCount > 0 ? 'in-cart' : ''}`}
                     onClick={(e) => {
-                      e.stopPropagation(); // Evitar abrir el modal si solo quiere agregar rápido
+                      e.stopPropagation();
                       handleAddToCartWithKafka(product);
                     }}
                     disabled={isOutOfStock}
                     aria-label={`Agregar ${product.name} al carrito`}
-                    title="Agregar directo al carrito"
+                    title="Añadir directo al carrito"
                   >
                     {isOutOfStock ? (
                       <span>Agotado</span>

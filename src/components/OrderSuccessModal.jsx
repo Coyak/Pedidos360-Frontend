@@ -83,7 +83,7 @@ export const OrderSuccessModal = ({ orderData, onClose }) => {
               className="btn btn-secondary tech-toggle-btn"
               onClick={() => setShowTechDetails(!showTechDetails)}
             >
-              <span>{showTechDetails ? 'Ocultar Trazabilidad Cloud' : 'Inspeccionar Trazabilidad AWS & Azure AD (Evaluación)'}</span>
+              <span>{showTechDetails ? 'Ocultar Trazabilidad Técnica' : 'Ver Trazabilidad de Infraestructura & Seguridad'}</span>
             </button>
 
             {showTechDetails && (

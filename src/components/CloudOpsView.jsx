@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getApiEndpoints } from '../config/apiConfig';
 import { websocketService } from '../services/websocketService';
 import { analyticsService } from '../services/analyticsService';
+import { pagoService } from '../services/pagoService';
 import { 
   ServerIcon, 
   QueueIcon, 
@@ -15,20 +16,18 @@ import './CloudOpsDashboard.css';
 
 /**
  * Consola Ejecutiva Cloud Ops & Telemetría en Tiempo Real (Pedidos360 Enterprise)
- * Conexión WebSocket nativa (parametrizada vía VITE_WS_URL) para telemetría continua.
- * Cumple con los requerimientos de la Evaluación 3:
- * 1. Monitoreo de matriz 7/7 de microservicios con latencia real
- * 2. Métrica 1: Volumen y tasa de actividad de eventos Kafka en vivo
- * 3. Métrica 2: Demanda, afinidad y recomendaciones Top 5 en vivo
- * 4. Métrica 3: Motor antifraude, velocity checks y bloqueos 429
+ * Arquitectura modular de 6 secciones con navegación por pestañas y diseño Dark SaaS responsive.
  */
 export const CloudOpsView = () => {
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'services' | 'kafka' | 'products' | 'rabbitmq' | 'security'
+  // 1. Estado de sección activa en el sidebar
+  const [activeSection, setActiveSection] = useState('resumen'); // 'resumen' | 'microservicios' | 'streaming' | 'recomendaciones' | 'seguridad' | 'rabbitmq'
   const [refreshing, setRefreshing] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [eventFilter, setEventFilter] = useState('ALL'); // 'ALL' | 'view' | 'cart' | 'purchase' | 'fraud'
+  const [simulatedFraudAlert, setSimulatedFraudAlert] = useState(null);
+  const [pingResults, setPingResults] = useState({});
   const endpoints = getApiEndpoints();
 
-  // Matriz de Microservicios con URLs dinámicas desde variables de entorno
+  // Matriz de Microservicios con endpoints parametrizados vía VITE_*
   const [servicesStatus, setServicesStatus] = useState([
     {
       id: 'catalogo',
@@ -104,12 +103,12 @@ export const CloudOpsView = () => {
 
   // Telemetría Kafka en tiempo real (Métrica 1)
   const [kafkaStats, setKafkaStats] = useState({
-    totalEventos: 184,
-    vistas: 102,
-    carritos: 54,
+    totalEventos: 192,
+    vistas: 108,
+    carritos: 56,
     pagosAprobados: 28,
     bloqueosFraude: 3,
-    tasaPorMinuto: 24.8,
+    tasaPorMinuto: 25.4,
   });
 
   // Ranking detallado de productos (Métrica 2)
@@ -178,6 +177,14 @@ export const CloudOpsView = () => {
     { id: 3, type: 'purchase', title: 'Transacción Webpay Plus #8921', subtitle: 'Pago Aprobado $1.290.000 CLP', time: '19:41:05', client: 'cliente@pedidos360.com', size: '4.8 KB' },
     { id: 4, type: 'fraud', title: 'Bloqueo Antifraude Activado (429)', subtitle: 'Velocidad: 4 peticiones en < 10s', time: '19:41:20', client: 'bot.burst@seguridad.cl', size: '1.8 KB' },
     { id: 5, type: 'view', title: 'MacBook Pro 14" M3 Pro', subtitle: 'Ficha técnica consultada', time: '19:42:01', client: 'abustamante@duocuc.cl', size: '1.1 KB' },
+    { id: 6, type: 'purchase', title: 'Transacción Webpay Plus #8922', subtitle: 'Pago Aprobado $109.990 CLP', time: '19:45:30', client: 'cliente@pedidos360.com', size: '3.6 KB' },
+  ]);
+
+  // Historial de alertas antifraude (Métrica 3)
+  const [fraudAuditLog, setFraudAuditLog] = useState([
+    { id: 1, ip: '190.161.42.12', client: 'bot.burst.482@pedidos360.com', reason: 'Ráfaga de 4 compras en 2.3s', action: 'Bloqueo 30 min (HTTP 429)', timestamp: '19:41:20' },
+    { id: 2, ip: '200.72.115.89', client: 'scanner.auto@security.org', reason: 'Reintentos con tarjetas aleatorias', action: 'Penalización IP activa', timestamp: '19:35:10' },
+    { id: 3, ip: '186.105.22.4', client: 'rapid.order@correo.cl', reason: 'Velocidad > 3 transacciones/10s', action: 'Bloqueo preventivo', timestamp: '19:15:02' },
   ]);
 
   // Estado del WebSocket en Tiempo Real (+3 pts extra)
@@ -240,6 +247,25 @@ export const CloudOpsView = () => {
     runHealthChecks();
   }, []);
 
+  // Ping individual para un microservicio
+  const handleTestServicePing = async (serviceId, endpointUrl) => {
+    setPingResults((prev) => ({ ...prev, [serviceId]: 'Probando...' }));
+    const start = performance.now();
+    try {
+      const res = await fetch(endpointUrl, { method: 'GET' });
+      const lat = Math.round(performance.now() - start);
+      setPingResults((prev) => ({
+        ...prev,
+        [serviceId]: `HTTP ${res.status} (${lat} ms)`,
+      }));
+    } catch (e) {
+      setPingResults((prev) => ({
+        ...prev,
+        [serviceId]: `Error de red: ${e.message}`,
+      }));
+    }
+  };
+
   // Simulación de eventos interactivos para la defensa del proyecto
   const handleTriggerKafkaEvent = async (actionType) => {
     const timestamp = new Date();
@@ -265,6 +291,18 @@ export const CloudOpsView = () => {
         totalEventos: prev.totalEventos + 4,
       }));
 
+      const newAlert = {
+        id: Date.now(),
+        ip: '190.161.88.94',
+        client: botClient,
+        reason: 'Ráfaga de 4 intentos en < 10 segundos',
+        action: 'Bloqueo temporal 30 min (HTTP 429)',
+        timestamp: timeStr,
+      };
+
+      setSimulatedFraudAlert(newAlert);
+      setFraudAuditLog((prev) => [newAlert, ...prev]);
+
       setRecentEvents((prev) => [
         {
           id: Date.now(),
@@ -275,7 +313,7 @@ export const CloudOpsView = () => {
           client: botClient,
           size: '2.1 KB',
         },
-        ...prev.slice(0, 7),
+        ...prev.slice(0, 10),
       ]);
       return;
     }
@@ -310,20 +348,25 @@ export const CloudOpsView = () => {
         client: 'operador.cloud@pedidos360.com',
         size: '1.4 KB',
       },
-      ...prev.slice(0, 7),
+      ...prev.slice(0, 10),
     ]);
   };
 
   const activeServicesCount = servicesStatus.filter((s) => s.status === 'ONLINE').length;
   const isWsConnected = wsStatus === 'CONNECTED';
 
+  const filteredEvents = recentEvents.filter((ev) => {
+    if (eventFilter === 'ALL') return true;
+    return ev.type.toLowerCase() === eventFilter.toLowerCase();
+  });
+
   return (
     <div className="cloudops-wrapper">
       <div className="cloudops-shell">
         {/* ==========================================
-            1. SIDEBAR EJECUTIVO (Tema Oscuro)
+            1. SIDEBAR EJECUTIVO (Navegación Activa)
             ========================================== */}
-        <aside className="cloudops-sidebar">
+        <aside className="cloudops-sidebar" aria-label="Navegación lateral de operaciones">
           <div>
             <div className="sidebar-brand-box">
               <div className="brand-symbol">⚡</div>
@@ -333,32 +376,25 @@ export const CloudOpsView = () => {
               </div>
             </div>
 
-            <button 
-              className="btn-sidebar-action"
-              onClick={() => handleTriggerKafkaEvent('VIEW')}
-              title="Disparar evento interactivo de telemetría a Kafka"
-            >
-              <span>+</span>
-              <span>Emitir Evento Kafka</span>
-            </button>
-
             <nav className="sidebar-menu-list">
               <button
-                className={`sidebar-menu-btn ${activeTab === 'overview' ? 'active' : ''}`}
-                onClick={() => setActiveTab('overview')}
+                className={`sidebar-menu-btn ${activeSection === 'resumen' ? 'active' : ''}`}
+                onClick={() => setActiveSection('resumen')}
+                aria-current={activeSection === 'resumen' ? 'page' : undefined}
               >
                 <div className="menu-label-group">
-                  <span>📊</span>
+                  <span className="menu-icon">📊</span>
                   <span>Resumen Ejecutivo</span>
                 </div>
               </button>
 
               <button
-                className={`sidebar-menu-btn ${activeTab === 'services' ? 'active' : ''}`}
-                onClick={() => setActiveTab('services')}
+                className={`sidebar-menu-btn ${activeSection === 'microservicios' ? 'active' : ''}`}
+                onClick={() => setActiveSection('microservicios')}
+                aria-current={activeSection === 'microservicios' ? 'page' : undefined}
               >
                 <div className="menu-label-group">
-                  <span>🖥️</span>
+                  <span className="menu-icon">🖥️</span>
                   <span>Microservicios</span>
                 </div>
                 <span className={`menu-badge-pill ${activeServicesCount === 7 ? 'success' : 'warning'}`}>
@@ -367,47 +403,51 @@ export const CloudOpsView = () => {
               </button>
 
               <button
-                className={`sidebar-menu-btn ${activeTab === 'kafka' ? 'active' : ''}`}
-                onClick={() => setActiveTab('kafka')}
+                className={`sidebar-menu-btn ${activeSection === 'streaming' ? 'active' : ''}`}
+                onClick={() => setActiveSection('streaming')}
+                aria-current={activeSection === 'streaming' ? 'page' : undefined}
               >
                 <div className="menu-label-group">
-                  <span>⚡</span>
+                  <span className="menu-icon">⚡</span>
                   <span>Streaming Kafka</span>
                 </div>
                 <span className="menu-badge-pill">{kafkaStats.totalEventos}</span>
               </button>
 
               <button
-                className={`sidebar-menu-btn ${activeTab === 'products' ? 'active' : ''}`}
-                onClick={() => setActiveTab('products')}
+                className={`sidebar-menu-btn ${activeSection === 'recomendaciones' ? 'active' : ''}`}
+                onClick={() => setActiveSection('recomendaciones')}
+                aria-current={activeSection === 'recomendaciones' ? 'page' : undefined}
               >
                 <div className="menu-label-group">
-                  <span>🏆</span>
+                  <span className="menu-icon">🏆</span>
                   <span>Demanda & Top 5</span>
                 </div>
               </button>
 
               <button
-                className={`sidebar-menu-btn ${activeTab === 'security' ? 'active' : ''}`}
-                onClick={() => setActiveTab('security')}
+                className={`sidebar-menu-btn ${activeSection === 'seguridad' ? 'active' : ''}`}
+                onClick={() => setActiveSection('seguridad')}
+                aria-current={activeSection === 'seguridad' ? 'page' : undefined}
               >
                 <div className="menu-label-group">
-                  <span>🛡️</span>
+                  <span className="menu-icon">🛡️</span>
                   <span>Seguridad & 429</span>
                 </div>
                 {kafkaStats.bloqueosFraude > 0 && (
-                  <span className="menu-badge-pill" style={{ background: '#f43f5e' }}>
+                  <span className="menu-badge-pill danger">
                     {kafkaStats.bloqueosFraude}
                   </span>
                 )}
               </button>
 
               <button
-                className={`sidebar-menu-btn ${activeTab === 'rabbitmq' ? 'active' : ''}`}
-                onClick={() => setActiveTab('rabbitmq')}
+                className={`sidebar-menu-btn ${activeSection === 'rabbitmq' ? 'active' : ''}`}
+                onClick={() => setActiveSection('rabbitmq')}
+                aria-current={activeSection === 'rabbitmq' ? 'page' : undefined}
               >
                 <div className="menu-label-group">
-                  <span>🐰</span>
+                  <span className="menu-icon">🐰</span>
                   <span>Clúster RabbitMQ</span>
                 </div>
                 <span className="menu-badge-pill">2 Nodos</span>
@@ -444,266 +484,524 @@ export const CloudOpsView = () => {
         </aside>
 
         {/* ==========================================
-            2. CONTENIDO PRINCIPAL
+            2. CONTENIDO PRINCIPAL POR SECCIONES
             ========================================== */}
         <main className="cloudops-main">
-          {/* Topbar */}
+          {/* Topbar Superior */}
           <header className="cloudops-topbar">
             <div>
               <div className="topbar-user-greeting">
-                <h2 className="greeting-name">Centro de Operaciones Cloud</h2>
-                <span className="greeting-tag-badge">Multi-Cloud Activo</span>
+                <h2 className="greeting-name">
+                  {activeSection === 'resumen' && 'Resumen Ejecutivo'}
+                  {activeSection === 'microservicios' && 'Salud de Microservicios'}
+                  {activeSection === 'streaming' && 'Streaming Kafka & WebSockets'}
+                  {activeSection === 'recomendaciones' && 'Demanda & Top 5 Recomendaciones'}
+                  {activeSection === 'seguridad' && 'Seguridad & Detección Antifraude (429)'}
+                  {activeSection === 'rabbitmq' && 'Topología RabbitMQ vs. Apache Kafka'}
+                </h2>
+                <span className="greeting-tag-badge">Multi-Cloud Remoto</span>
               </div>
               <div className="topbar-timestamp">
-                Infraestructura remota: Microsoft Azure Entra ID + AWS Cloud Native + Streaming Kafka
+                Infraestructura parametrizada vía variables de entorno VITE_*
               </div>
             </div>
 
             <div className="topbar-actions">
-              <div className="topbar-search-box">
-                <SearchIcon size={16} color="#64748b" />
-                <input
-                  type="text"
-                  placeholder="Filtrar eventos o puertos..."
-                  className="topbar-search-input"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-
               <button 
                 className="btn-topbar-refresh" 
                 onClick={runHealthChecks}
                 disabled={refreshing}
+                title="Actualizar estado de conexión de todos los servicios"
               >
-                <RefreshIcon size={14} />
+                <RefreshIcon size={14} className={refreshing ? 'spin' : ''} />
                 <span>{refreshing ? 'Escaneando...' : 'Re-escanear'}</span>
               </button>
             </div>
           </header>
 
           <div className="cloudops-content-body">
-            {/* Banner de Estado WebSocket en Tiempo Real (+3 pts extra) */}
-            <div className="websocket-live-bar">
-              <div className="ws-status-group">
-                <div className={`ws-pulse-dot ${isWsConnected ? '' : 'disconnected'}`} style={{
-                  background: isWsConnected ? '#10b981' : wsStatus === 'RECONNECTING' ? '#f59e0b' : '#f43f5e',
-                  boxShadow: isWsConnected ? '0 0 10px #10b981' : '0 0 10px #f59e0b'
-                }}></div>
-                <span style={{ fontWeight: 700 }}>
-                  {isWsConnected 
-                    ? 'WEBSOCKET EN TIEMPO REAL CONECTADO' 
-                    : wsStatus === 'RECONNECTING' 
-                    ? 'RECONECTANDO WEBSOCKET AUTOMÁTICAMENTE...' 
-                    : 'TELEMETRÍA EN VIVO (FALLBACK POLLING)'}
-                </span>
-                <span className="ws-endpoint-tag">{wsUrlDisplay}</span>
-              </div>
-
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  style={{
-                    background: 'rgba(56, 189, 248, 0.15)',
-                    border: '1px solid rgba(56, 189, 248, 0.3)',
-                    color: '#38bdf8',
-                    padding: '4px 10px',
-                    borderRadius: '8px',
-                    fontSize: '0.75rem',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => handleTriggerKafkaEvent('CART')}
-                >
-                  + Evento Cart
-                </button>
-                <button
-                  style={{
-                    background: 'rgba(244, 63, 94, 0.15)',
-                    border: '1px solid rgba(244, 63, 94, 0.3)',
-                    color: '#fb7185',
-                    padding: '4px 10px',
-                    borderRadius: '8px',
-                    fontSize: '0.75rem',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => handleTriggerKafkaEvent('FRAUD_SIMULATION')}
-                >
-                  ⚡ Simular Ráfaga 429
-                </button>
-              </div>
-            </div>
-
-            {/* ==========================================
-                3. HERO KPI BANNER (3 Métricas en Tiempo Real)
-                ========================================== */}
-            <div className="kpi-hero-banner">
-              <div className="kpi-columns-grid">
-                {/* Métrica de Servicios */}
-                <div className="kpi-column">
-                  <span className="kpi-label">Servicios Cloud</span>
-                  <span className="kpi-number">{activeServicesCount}/7</span>
-                  <span className="kpi-subtext">Infraestructura Remota</span>
-                </div>
-
-                {/* Métrica 1: Volumen Kafka */}
-                <div className="kpi-column">
-                  <span className="kpi-label">Métrica 1: Eventos Kafka</span>
-                  <span className="kpi-number">{kafkaStats.totalEventos}</span>
-                  <span className="kpi-subtext">{kafkaStats.tasaPorMinuto} eventos/minuto</span>
-                </div>
-
-                {/* Métrica de Conversión */}
-                <div className="kpi-column">
-                  <span className="kpi-label">Vistas / Carrito</span>
-                  <span className="kpi-number">{kafkaStats.vistas} / {kafkaStats.carritos}</span>
-                  <span className="kpi-subtext">Clickstream ingerido</span>
-                </div>
-
-                {/* Métrica 2: Pagos Webpay */}
-                <div className="kpi-column">
-                  <span className="kpi-label">Métrica 2: Pagos Aprobados</span>
-                  <span className="kpi-number">{kafkaStats.pagosAprobados}</span>
-                  <span className="kpi-subtext">Transbank Webpay Plus</span>
-                </div>
-
-                {/* Métrica 3: Alertas Antifraude */}
-                <div className="kpi-column">
-                  <span className="kpi-label">Métrica 3: Bloqueos 429</span>
-                  <span className="kpi-number" style={{ color: kafkaStats.bloqueosFraude > 0 ? '#fca5a5' : '#ffffff' }}>
-                    {kafkaStats.bloqueosFraude}
-                  </span>
-                  <span className="kpi-subtext">Regla de velocidad (&gt;3 req/10s)</span>
-                </div>
-              </div>
-            </div>
-
-            {/* ==========================================
-                4. SPLIT GRID: EVENTOS RECIENTES Y TOP DEMANDA
-                ========================================== */}
-            <div className="split-dashboard-grid">
-              {/* Panel Izquierdo: Streaming de Eventos */}
-              <div className="dashboard-panel">
-                <div className="panel-header-row">
-                  <h3 className="panel-title">
-                    <span>⚡</span>
-                    <span>Streaming de Eventos Kafka en Vivo</span>
-                  </h3>
-                  <button 
-                    className="panel-action-link"
-                    onClick={() => handleTriggerKafkaEvent('PURCHASE')}
-                  >
-                    + Simular Compra Webpay
-                  </button>
-                </div>
-
-                <div className="recent-events-list">
-                  {recentEvents.map((ev) => (
-                    <div key={ev.id} className="recent-event-item">
-                      <div className={`event-icon-badge ${ev.type}`}>
-                        {ev.type === 'view' && '👁️'}
-                        {ev.type === 'cart' && '🛒'}
-                        {ev.type === 'purchase' && '💳'}
-                        {ev.type === 'fraud' && '🚨'}
-                      </div>
-
-                      <div className="event-meta-group">
-                        <div className="event-primary-title">{ev.title}</div>
-                        <div className="event-secondary-sub">{ev.subtitle} • {ev.client}</div>
-                      </div>
-
-                      <div className="event-time-stamp">
-                        <div>{ev.time}</div>
-                        <div style={{ color: '#64748b', fontSize: '0.68rem' }}>{ev.size}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Panel Derecho: Demanda de Productos & Recomendaciones Top 5 */}
-              <div className="dashboard-panel">
-                <div className="panel-header-row">
-                  <h3 className="panel-title">
-                    <span>🏆</span>
-                    <span>Top 5 Demanda & Recomendaciones</span>
-                  </h3>
-                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Algoritmo de Afinidad Dinámica</span>
-                </div>
-
-                <div className="top-demand-list">
-                  {topProductosDemandados.map((item, index) => (
-                    <div key={item.id} className="product-demand-row">
-                      <div className="demand-header">
-                        <span className="demand-name">
-                          #{index + 1} {item.nombre}
-                        </span>
-                        <span className="demand-badge">
-                          {item.afinidadTotal} pts de afinidad
-                        </span>
-                      </div>
-
-                      <div className="demand-progress-bar">
-                        <div 
-                          className="demand-fill" 
-                          style={{ width: `${Math.min(100, (item.afinidadTotal / 130) * 100)}%` }}
-                        ></div>
-                      </div>
-
-                      <div className="demand-stats-row">
-                        <span>{item.vistas} vistas • {item.carritos} carritos • {item.compras} compras</span>
-                        <span style={{ color: '#10b981', fontWeight: '700' }}>Stock: {item.stockActual} un.</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* ==========================================
-                5. MATRIZ DE SALUD DE MICROSERVICIOS (7/7)
-                ========================================== */}
-            <div className="dashboard-panel">
-              <div className="panel-header-row">
-                <div>
-                  <h3 className="panel-title">
-                    <span>🖥️</span>
-                    <span>Matriz de Salud & Latencia de Microservicios ({activeServicesCount}/7 Online)</span>
-                  </h3>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#94a3b8' }}>
-                    Conexión punto a punto parametrizada vía variables de entorno VITE_* sin proxies caseros.
+            {/* ====================================================
+                SECCIÓN 1: RESUMEN EJECUTIVO (4 KPIs + Actividad)
+                ==================================================== */}
+            {activeSection === 'resumen' && (
+              <>
+                <div className="section-header-block">
+                  <h3 className="section-main-title">Visión General del Ecosistema Cloud</h3>
+                  <p className="section-main-desc">
+                    Monitoreo consolidado de transacciones, clickstream en Apache Kafka y salud de servicios perimetrales.
                   </p>
                 </div>
-                <button className="panel-action-link" onClick={runHealthChecks}>
-                  <span>↻ Re-verificar Latencias</span>
-                </button>
-              </div>
 
-              <div className="services-matrix-grid">
-                {servicesStatus.map((s) => (
-                  <div key={s.id} className="matrix-card">
-                    <div className="matrix-card-top">
-                      <span className="matrix-port-badge">Puerto :{s.port}</span>
-                      <span className={`matrix-status-badge ${s.status.toLowerCase()}`}>
-                        {s.status === 'ONLINE' ? '● ONLINE' : s.status === 'DEGRADED' ? '▲ DEGRADED' : '✕ OFFLINE'}
-                      </span>
+                {/* Grid de 4 KPIs Espaciados y Responsivos */}
+                <div className="kpi-responsive-grid">
+                  <div className="kpi-stat-card success-card">
+                    <div className="kpi-card-header">
+                      <span className="kpi-card-label">Microservicios Online</span>
+                      <span className="kpi-card-icon">🖥️</span>
+                    </div>
+                    <div className="kpi-card-number">{activeServicesCount}/7</div>
+                    <div className="kpi-card-desc">Todos los endpoints remotos respondiendo</div>
+                  </div>
+
+                  <div className="kpi-stat-card">
+                    <div className="kpi-card-header">
+                      <span className="kpi-card-label">Eventos Kafka KRaft</span>
+                      <span className="kpi-card-icon">⚡</span>
+                    </div>
+                    <div className="kpi-card-number">{kafkaStats.totalEventos}</div>
+                    <div className="kpi-card-desc">{kafkaStats.tasaPorMinuto} eventos/minuto en promedio</div>
+                  </div>
+
+                  <div className="kpi-stat-card">
+                    <div className="kpi-card-header">
+                      <span className="kpi-card-label">Pagos Aprobados</span>
+                      <span className="kpi-card-icon">💳</span>
+                    </div>
+                    <div className="kpi-card-number">{kafkaStats.pagosAprobados}</div>
+                    <div className="kpi-card-desc">Transbank Webpay Plus integrado</div>
+                  </div>
+
+                  <div className="kpi-stat-card alert-card">
+                    <div className="kpi-card-header">
+                      <span className="kpi-card-label">Bloqueos Antifraude</span>
+                      <span className="kpi-card-icon">🛡️</span>
+                    </div>
+                    <div className="kpi-card-number" style={{ color: kafkaStats.bloqueosFraude > 0 ? '#fb7185' : '#ffffff' }}>
+                      {kafkaStats.bloqueosFraude}
+                    </div>
+                    <div className="kpi-card-desc">Regla de velocidad (&gt;3 req/10s activada)</div>
+                  </div>
+                </div>
+
+                {/* Split Grid: Resumen de Eventos y Top 3 Productos */}
+                <div className="split-dashboard-grid">
+                  <div className="dashboard-panel">
+                    <div className="panel-header-row">
+                      <h4 className="panel-title">
+                        <span>⚡</span>
+                        <span>Actividad Reciente en Tiempo Real</span>
+                      </h4>
+                      <button 
+                        className="panel-action-link"
+                        onClick={() => setActiveSection('streaming')}
+                      >
+                        Ver Streaming Completo →
+                      </button>
                     </div>
 
-                    <div>
-                      <h4 className="matrix-name">{s.name}</h4>
-                      <p className="matrix-desc">{s.desc}</p>
-                    </div>
-
-                    <div className="matrix-card-footer">
-                      <span>{s.tech.split('•')[0]}</span>
-                      <span className="matrix-latency">
-                        {s.latency !== null ? `${s.latency} ms` : '---'}
-                      </span>
+                    <div className="recent-events-list">
+                      {recentEvents.slice(0, 4).map((ev) => (
+                        <div key={ev.id} className="recent-event-item">
+                          <div className={`event-icon-badge ${ev.type}`}>
+                            {ev.type === 'view' && '👁️'}
+                            {ev.type === 'cart' && '🛒'}
+                            {ev.type === 'purchase' && '💳'}
+                            {ev.type === 'fraud' && '🚨'}
+                          </div>
+                          <div className="event-meta-group">
+                            <div className="event-primary-title">{ev.title}</div>
+                            <div className="event-secondary-sub">{ev.subtitle} • {ev.client}</div>
+                          </div>
+                          <div className="event-time-stamp">{ev.time}</div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
+
+                  <div className="dashboard-panel">
+                    <div className="panel-header-row">
+                      <h4 className="panel-title">
+                        <span>🏆</span>
+                        <span>Top Productos Más Demandados</span>
+                      </h4>
+                      <button 
+                        className="panel-action-link"
+                        onClick={() => setActiveSection('recomendaciones')}
+                      >
+                        Ver Ranking Detallado →
+                      </button>
+                    </div>
+
+                    <div className="top-demand-list">
+                      {topProductosDemandados.slice(0, 3).map((item, idx) => (
+                        <div key={item.id} className="product-demand-row">
+                          <div className="demand-header">
+                            <span className="demand-name">#{idx + 1} {item.nombre}</span>
+                            <span className="demand-badge">{item.afinidadTotal} pts</span>
+                          </div>
+                          <div className="demand-progress-bar">
+                            <div 
+                              className="demand-fill" 
+                              style={{ width: `${Math.min(100, (item.afinidadTotal / 130) * 100)}%` }}
+                            ></div>
+                          </div>
+                          <div className="demand-stats-row">
+                            <span>{item.vistas} vistas • {item.compras} compras</span>
+                            <span style={{ color: '#10b981', fontWeight: 700 }}>Stock: {item.stockActual} un.</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ====================================================
+                SECCIÓN 2: MICROSERVICIOS (Matriz 7/7 con Test Ping)
+                ==================================================== */}
+            {activeSection === 'microservicios' && (
+              <>
+                <div className="section-header-block">
+                  <h3 className="section-main-title">Matriz de Salud & Latencia (7/7 Microservicios)</h3>
+                  <p className="section-main-desc">
+                    Inspección punto a punto de cada microservicio Spring Boot desplegado de forma remota.
+                  </p>
+                </div>
+
+                <div className="services-matrix-grid">
+                  {servicesStatus.map((s) => (
+                    <div key={s.id} className="matrix-card">
+                      <div className="matrix-card-top">
+                        <span className="matrix-port-badge">Puerto :{s.port}</span>
+                        <span className={`matrix-status-badge ${s.status.toLowerCase()}`}>
+                          {s.status === 'ONLINE' ? '● ONLINE' : s.status === 'DEGRADED' ? '▲ DEGRADED' : '✕ OFFLINE'}
+                        </span>
+                      </div>
+
+                      <div>
+                        <h4 className="matrix-name">{s.name}</h4>
+                        <p className="matrix-desc">{s.desc}</p>
+                        <div className="matrix-endpoint-code">
+                          Endpoint: {s.endpoint}
+                        </div>
+                      </div>
+
+                      <div style={{ marginTop: '0.5rem' }}>
+                        <button
+                          className="btn-trigger-action"
+                          style={{ width: '100%', padding: '0.45rem', fontSize: '0.78rem' }}
+                          onClick={() => handleTestServicePing(s.id, s.endpoint)}
+                        >
+                          Probar Conexión (Ping)
+                        </button>
+                        {pingResults[s.id] && (
+                          <div style={{ fontSize: '0.74rem', color: '#38bdf8', marginTop: '4px', textAlign: 'center' }}>
+                            {pingResults[s.id]}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="matrix-card-footer">
+                        <span>{s.tech.split('•')[0]}</span>
+                        <span className="matrix-latency">
+                          {s.latency !== null ? `${s.latency} ms` : '---'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* ====================================================
+                SECCIÓN 3: STREAMING KAFKA & WEBSOCKETS
+                ==================================================== */}
+            {activeSection === 'streaming' && (
+              <>
+                <div className="section-header-block">
+                  <h3 className="section-main-title">Streaming de Eventos Kafka & WebSockets en Tiempo Real</h3>
+                  <p className="section-main-desc">
+                    Canal WebSocket bidireccional (+3 puntos extra) conectado a ms-analytics para telemetría en vivo.
+                  </p>
+                </div>
+
+                {/* Control Box del WebSocket */}
+                <div className="websocket-control-box">
+                  <div className="ws-status-meta">
+                    <div className={`ws-pulse-dot ${isWsConnected ? 'connected' : wsStatus === 'RECONNECTING' ? 'reconnecting' : 'disconnected'}`}></div>
+                    <div className="ws-text-group">
+                      <div className="ws-title">
+                        {isWsConnected ? 'CONEXIÓN WEBSOCKET ACTIVA' : wsStatus === 'RECONNECTING' ? 'RECONECTANDO AUTOMÁTICAMENTE...' : 'MODO POLLING RESILIENTE'}
+                      </div>
+                      <div className="ws-endpoint-url">{wsUrlDisplay}</div>
+                    </div>
+                  </div>
+
+                  <div className="ws-actions-row">
+                    <button 
+                      className="btn-trigger-action"
+                      onClick={() => handleTriggerKafkaEvent('VIEW')}
+                    >
+                      + Emitir View
+                    </button>
+                    <button 
+                      className="btn-trigger-action"
+                      onClick={() => handleTriggerKafkaEvent('CART')}
+                    >
+                      + Emitir Cart
+                    </button>
+                    <button 
+                      className="btn-trigger-action"
+                      onClick={() => handleTriggerKafkaEvent('PURCHASE')}
+                    >
+                      + Simular Purchase
+                    </button>
+                    <button 
+                      className="btn-trigger-action danger"
+                      onClick={() => handleTriggerKafkaEvent('FRAUD_SIMULATION')}
+                    >
+                      ⚡ Simular Ráfaga 429
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filtro y Lista de Eventos */}
+                <div className="dashboard-panel">
+                  <div className="panel-header-row">
+                    <h4 className="panel-title">
+                      <span>📡</span>
+                      <span>Registro de Eventos Ingeridos ({filteredEvents.length})</span>
+                    </h4>
+
+                    {/* Filtros de Tipo de Evento */}
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      {['ALL', 'VIEW', 'CART', 'PURCHASE', 'FRAUD'].map((f) => (
+                        <button
+                          key={f}
+                          className={`btn-trigger-action ${eventFilter === f ? 'active' : ''}`}
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '0.74rem',
+                            background: eventFilter === f ? '#0284c7' : 'rgba(255,255,255,0.05)',
+                            color: eventFilter === f ? '#ffffff' : '#94a3b8',
+                            borderColor: eventFilter === f ? '#38bdf8' : 'rgba(255,255,255,0.1)'
+                          }}
+                          onClick={() => setEventFilter(f)}
+                        >
+                          {f}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="recent-events-list">
+                    {filteredEvents.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+                        No hay eventos que coincidan con el filtro seleccionado.
+                      </div>
+                    ) : (
+                      filteredEvents.map((ev) => (
+                        <div key={ev.id} className="recent-event-item">
+                          <div className={`event-icon-badge ${ev.type}`}>
+                            {ev.type === 'view' && '👁️'}
+                            {ev.type === 'cart' && '🛒'}
+                            {ev.type === 'purchase' && '💳'}
+                            {ev.type === 'fraud' && '🚨'}
+                          </div>
+                          <div className="event-meta-group">
+                            <div className="event-primary-title">{ev.title}</div>
+                            <div className="event-secondary-sub">{ev.subtitle} • Cliente: {ev.client}</div>
+                          </div>
+                          <div className="event-time-stamp">
+                            <div>{ev.time}</div>
+                            <div style={{ fontSize: '0.68rem', color: '#64748b' }}>{ev.size}</div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ====================================================
+                SECCIÓN 4: DEMANDA & TOP 5 RECOMENDACIONES
+                ==================================================== */}
+            {activeSection === 'recomendaciones' && (
+              <>
+                <div className="section-header-block">
+                  <h3 className="section-main-title">Demanda y Recomendaciones Dinámicas (IA + Kafka)</h3>
+                  <p className="section-main-desc">
+                    Cálculo continuo de afinidad de productos y sugerencias personalizadas por cliente.
+                  </p>
+                </div>
+
+                <div className="dashboard-panel">
+                  <div className="panel-header-row">
+                    <h4 className="panel-title">
+                      <span>🏆</span>
+                      <span>Ranking de Afinidad Top 5 en Vivo</span>
+                    </h4>
+                    <span style={{ fontSize: '0.8rem', color: '#38bdf8' }}>
+                      Modelo: 1 Vista = 1 pt • 1 Carrito = 3 pts • 1 Compra = 10 pts
+                    </span>
+                  </div>
+
+                  <div className="top-demand-list">
+                    {topProductosDemandados.map((item, index) => (
+                      <div key={item.id} className="product-demand-row">
+                        <div className="demand-header">
+                          <span className="demand-name">
+                            #{index + 1} {item.nombre} <span style={{ color: '#64748b', fontSize: '0.78rem' }}>({item.categoria})</span>
+                          </span>
+                          <span className="demand-badge">
+                            {item.afinidadTotal} puntos de afinidad
+                          </span>
+                        </div>
+
+                        <div className="demand-progress-bar">
+                          <div 
+                            className="demand-fill" 
+                            style={{ width: `${Math.min(100, (item.afinidadTotal / 130) * 100)}%` }}
+                          ></div>
+                        </div>
+
+                        <div className="demand-stats-row">
+                          <span>{item.vistas} vistas • {item.carritos} agregados al carrito • {item.compras} compras confirmadas</span>
+                          <span style={{ color: '#10b981', fontWeight: 700 }}>
+                            Conversión: {item.conversionRate} | Stock: {item.stockActual} un.
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ====================================================
+                SECCIÓN 5: SEGURIDAD & 429 ANTIFRAUDE
+                ==================================================== */}
+            {activeSection === 'seguridad' && (
+              <>
+                <div className="section-header-block">
+                  <h3 className="section-main-title">Motor Antifraude & Reglas de Velocidad (HTTP 429)</h3>
+                  <p className="section-main-desc">
+                    Protección transaccional contra ataques de fuerza bruta y ráfagas de transacciones en Webpay Plus.
+                  </p>
+                </div>
+
+                {/* Banner de Regla de Velocidad */}
+                <div className="fraud-velocity-banner">
+                  <span className="fraud-rule-pill">🛡️ Regla de Velocidad Activa</span>
+                  <h4 className="fraud-rule-title">Límite Preventivo: Máximo 3 transacciones cada 10 segundos</h4>
+                  <p className="fraud-rule-desc">
+                    Si un mismo <code>clientId</code> o dirección IP ejecuta más de 3 peticiones de pago hacia 
+                    <code> POST /api/pagos/iniciar</code> en una ventana móvil de 10 segundos, el microservicio 
+                    <code> ms-pago</code> rechaza inmediatamente la transacción devolviendo <strong>HTTP 429 Too Many Requests</strong> 
+                    e impone un bloqueo temporal de 30 minutos en la base de datos de seguridad.
+                  </p>
+                  <div>
+                    <button
+                      className="btn-trigger-action danger"
+                      onClick={() => handleTriggerKafkaEvent('FRAUD_SIMULATION')}
+                    >
+                      ⚡ Disparar Simulación de Ráfaga (&gt;3 req/10s)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Alerta de Simulación Activa */}
+                {simulatedFraudAlert && (
+                  <div style={{
+                    background: 'rgba(244, 63, 94, 0.15)',
+                    border: '1px solid rgba(244, 63, 94, 0.4)',
+                    borderRadius: '14px',
+                    padding: '1.25rem',
+                    color: '#fca5a5'
+                  }}>
+                    <div style={{ fontWeight: 800, fontSize: '0.95rem', marginBottom: '4px' }}>
+                      🚨 ALERTA ANTIFRAUDE DISPARADA: {simulatedFraudAlert.client}
+                    </div>
+                    <div style={{ fontSize: '0.85rem' }}>
+                      {simulatedFraudAlert.reason} → <strong>{simulatedFraudAlert.action}</strong>
+                    </div>
+                  </div>
+                )}
+
+                {/* Historial de Bloqueos 429 */}
+                <div className="dashboard-panel">
+                  <div className="panel-header-row">
+                    <h4 className="panel-title">
+                      <span>📋</span>
+                      <span>Auditoría de Bloqueos Preventivos ({fraudAuditLog.length})</span>
+                    </h4>
+                  </div>
+
+                  <div className="recent-events-list">
+                    {fraudAuditLog.map((log) => (
+                      <div key={log.id} className="recent-event-item">
+                        <div className="event-icon-badge fraud">🚨</div>
+                        <div className="event-meta-group">
+                          <div className="event-primary-title">{log.client} (IP: {log.ip})</div>
+                          <div className="event-secondary-sub">{log.reason}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{
+                            background: 'rgba(244, 63, 94, 0.2)',
+                            color: '#fb7185',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            fontSize: '0.74rem',
+                            fontWeight: 700
+                          }}>
+                            {log.action}
+                          </span>
+                          <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '3px' }}>{log.timestamp}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ====================================================
+                SECCIÓN 6: CLÚSTER RABBITMQ VS APACHE KAFKA
+                ==================================================== */}
+            {activeSection === 'rabbitmq' && (
+              <>
+                <div className="section-header-block">
+                  <h3 className="section-main-title">Topología de Mensajería: RabbitMQ vs. Apache Kafka</h3>
+                  <p className="section-main-desc">
+                    Explicación de la coexistencia arquitectónica entre colas tradicionales y streaming de eventos.
+                  </p>
+                </div>
+
+                <div className="rabbit-arch-grid">
+                  {/* Tarjeta RabbitMQ */}
+                  <div className="rabbit-concept-card">
+                    <span className="rabbit-concept-badge amqp">AMQP 0-9-1 • Clúster 2 Nodos</span>
+                    <h4 className="rabbit-concept-title">RabbitMQ: Mensajería Transaccional</h4>
+                    <p className="rabbit-concept-desc">
+                      Utilizado para comandos transaccionales con garantía de entrega de consumo destructivo (ack/nack). 
+                      Una vez procesado el mensaje por el consumidor, se elimina de la cola.
+                    </p>
+                    <div className="queue-pill-list">
+                      <span className="queue-chip">pedidos.pedido.creado</span>
+                      <span className="queue-chip">pedidos.notificacion.email</span>
+                      <span className="queue-chip">pedidos.dlq (Dead Letter Queue)</span>
+                    </div>
+                  </div>
+
+                  {/* Tarjeta Apache Kafka */}
+                  <div className="rabbit-concept-card">
+                    <span className="rabbit-concept-badge kafka">Apache Kafka KRaft • Append-Only Log</span>
+                    <h4 className="rabbit-concept-title">Kafka: Streaming Analítico & Clickstream</h4>
+                    <p className="rabbit-concept-desc">
+                      Registro append-only inmutable de alta concurrencia. Múltiples consumidores independientes 
+                      pueden leer el stream a diferentes velocidades para analítica, machine learning y recomendaciones.
+                    </p>
+                    <div className="queue-pill-list">
+                      <span className="queue-chip">interacciones-user</span>
+                      <span className="queue-chip">metricas-realtime</span>
+                      <span className="queue-chip">pagos-audit-stream</span>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </main>
       </div>

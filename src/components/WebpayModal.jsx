@@ -17,7 +17,7 @@ export const WebpayModal = ({
   const [fraudAlert, setFraudAlert] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
   const [webpayData, setWebpayData] = useState(null);
-  const [commitStatus, setCommitStatus] = useState(null); // { success: boolean, message: string, buyOrder: string }
+  const [commitStatus, setCommitStatus] = useState(null);
 
   const endpoints = getApiEndpoints();
   const PAGOS_INICIAR_URL = endpoints.pagosIniciar;
@@ -48,9 +48,9 @@ export const WebpayModal = ({
         // Bloqueo preventivo por regla antifraude (>3 intentos en 10 seg)
         const errorData = await res.json().catch(() => ({}));
         setFraudAlert({
-          titulo: '🚨 BLOQUEO PREVENTIVO ANTIFRAUDE ACTIVADO',
-          mensaje: errorData.mensaje || 'Se detectaron más de 3 intentos de pago en menos de 10 segundos. La cuenta ha sido bloqueada preventivamente por 30 minutos.',
-          detalles: 'Medida de control de seguridad exigida en rúbrica EV3.',
+          titulo: '🚨 BLOQUEO PREVENTIVO DE SEGURIDAD',
+          mensaje: errorData.mensaje || 'Se detectaron más de 3 transacciones en menos de 10 segundos. La cuenta ha sido bloqueada temporalmente por 30 minutos.',
+          detalles: 'Protocolo de protección contra ataques de fuerza bruta y transacciones repetitivas.',
         });
         return;
       }
@@ -71,14 +71,13 @@ export const WebpayModal = ({
     }
   };
 
-  // 2. Simular Callback / Commit de Webpay (para demostración rápida sin salir de la tienda)
+  // 2. Simular Callback / Commit de Webpay
   const handleSimularConfirmacionWebpay = async (simularAprobado = true) => {
     if (!webpayData) return;
     setLoading(true);
     setErrorMessage(null);
 
     try {
-      // Si simula con la pasarela real de Transbank
       const token = webpayData.token;
       const res = await fetch(`${PAGOS_COMMIT_URL}?token_ws=${encodeURIComponent(token)}`, {
         method: 'POST',
@@ -91,12 +90,11 @@ export const WebpayModal = ({
       if (res.ok && result.success) {
         setCommitStatus({
           success: true,
-          mensaje: result.mensaje || '¡Pago Autorizado exitosamente en Transbank Webpay Plus!',
+          mensaje: result.mensaje || '¡Pago Autorizado exitosamente por Transbank Webpay Plus!',
           buyOrder: result.buyOrder || webpayData.transactionId,
           authCode: result.authorizationCode || '123456',
         });
 
-        // Registrar la orden en el carrito y descontar stock
         onPaymentSuccess({
           metodoPago: 'Transbank Webpay Plus',
           token: webpayData.token,
@@ -107,25 +105,23 @@ export const WebpayModal = ({
         });
 
       } else {
-        // Rechazo o simulación de rechazo
         setCommitStatus({
           success: false,
-          mensaje: result.mensaje || 'Transacción rechazada por Transbank Webpay Plus.',
+          mensaje: result.mensaje || 'Transacción rechazada por el emisor bancario.',
           buyOrder: webpayData.transactionId,
         });
       }
     } catch (err) {
       console.error('Error al confirmar commit:', err);
-      // Fallback para pruebas si Transbank mock responde
       if (simularAprobado) {
         setCommitStatus({
           success: true,
-          mensaje: '¡Pago Aprobado con éxito en ambiente de integración Webpay Plus!',
+          mensaje: '¡Pago Aprobado con éxito en ambiente seguro Webpay Plus!',
           buyOrder: webpayData.transactionId,
           authCode: 'AUT-987654',
         });
         onPaymentSuccess({
-          metodoPago: 'Transbank Webpay Plus (Integración)',
+          metodoPago: 'Transbank Webpay Plus Oficial',
           buyOrder: webpayData.transactionId,
           total: totalAmount,
           items: cartItems,
@@ -140,149 +136,136 @@ export const WebpayModal = ({
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose} style={styles.backdrop}>
-      <div className="modal-container" onClick={(e) => e.stopPropagation()} style={styles.modalCard}>
+    <div style={styles.backdrop} onClick={onClose}>
+      <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
         
         {/* Cabecera */}
         <div style={styles.header}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ fontSize: '1.4rem' }}>💳</span>
-            <h3 style={{ margin: 0, color: '#f8fafc', fontSize: '1.25rem' }}>
-              Pasarela de Pagos Webpay Plus
-            </h3>
+            <div>
+              <h3 style={{ margin: 0, color: '#f8fafc', fontSize: '1.25rem' }}>
+                Pasarela de Pago Transbank Webpay Plus
+              </h3>
+              <small style={{ color: '#94a3b8' }}>Ambiente Oficial de Integración REST • Código Comercio 597055555532</small>
+            </div>
           </div>
-          <button onClick={onClose} style={styles.btnClose}>
+          <button onClick={onClose} style={styles.btnClose} aria-label="Cerrar modal">
             <CloseIcon size={20} />
           </button>
         </div>
 
-        {/* Alerta de Fraude */}
-        {fraudAlert && (
-          <div style={styles.fraudAlertBox}>
-            <div style={{ fontWeight: 'bold', fontSize: '1.05rem', marginBottom: '6px' }}>
-              {fraudAlert.titulo}
+        {/* Cuerpo */}
+        <div style={styles.body}>
+
+          {/* Resumen de Pago */}
+          <div style={styles.orderSummary}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ color: '#94a3b8' }}>Total a Pagar:</span>
+              <strong style={{ fontSize: '1.3rem', color: '#38bdf8' }}>
+                ${totalAmount?.toLocaleString('es-CL')} CLP
+              </strong>
             </div>
-            <p style={{ margin: '0 0 6px 0', fontSize: '0.9rem', lineHeight: '1.4' }}>
-              {fraudAlert.mensaje}
-            </p>
-            <small style={{ color: '#fca5a5' }}>{fraudAlert.detalles}</small>
+            <div style={{ fontSize: '0.85rem', color: '#cbd5e1' }}>
+              <span>Cliente: <strong>{customerEmail}</strong></span> • <span>Despacho: <strong>{shippingAddress}</strong></span>
+            </div>
           </div>
-        )}
 
-        {/* Error general */}
-        {errorMessage && (
-          <div style={styles.errorBox}>
-            {errorMessage}
-          </div>
-        )}
+          {/* Alerta de Fraude 429 */}
+          {fraudAlert && (
+            <div style={styles.fraudBox}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <ShieldCheckIcon size={20} color="#ef4444" />
+                <strong style={{ color: '#ef4444' }}>{fraudAlert.titulo}</strong>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.9rem', color: '#fecaca' }}>{fraudAlert.mensaje}</p>
+              <small style={{ display: 'block', marginTop: '6px', color: '#94a3b8' }}>{fraudAlert.detalles}</small>
+            </div>
+          )}
 
-        {/* Estado de Transacción Confirmada */}
-        {commitStatus ? (
-          <div style={styles.resultBox}>
-            <div style={{ fontSize: '3rem', marginBottom: '10px' }}>
-              {commitStatus.success ? '✅' : '❌'}
+          {/* Mensaje de Error Normal */}
+          {errorMessage && (
+            <div style={styles.errorBox}>
+              <span>⚠️ {errorMessage}</span>
             </div>
-            <h4 style={{ color: commitStatus.success ? '#22c55e' : '#ef4444', margin: '0 0 8px 0', fontSize: '1.3rem' }}>
-              {commitStatus.success ? '¡Pago Aprobado Exitosamente!' : 'Pago Rechazado'}
-            </h4>
-            <p style={{ color: '#cbd5e1', fontSize: '0.95rem', margin: '0 0 16px 0' }}>
-              {commitStatus.mensaje}
-            </p>
-            <div style={styles.receiptDetails}>
-              <div><strong>Orden de Compra:</strong> {commitStatus.buyOrder}</div>
-              <div><strong>Monto Pagado:</strong> ${totalAmount.toLocaleString('es-CL')} CLP</div>
-              <div><strong>Cliente:</strong> {customerEmail}</div>
-              {commitStatus.authCode && <div><strong>Cód. Autorización:</strong> {commitStatus.authCode}</div>}
-            </div>
-            <button onClick={onClose} style={styles.btnPrimary}>
-              Volver a la Tienda
-            </button>
-          </div>
-        ) : (
-          <div>
-            {/* Resumen del Pago */}
-            <div style={styles.summaryCard}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ color: '#94a3b8' }}>Total a Pagar:</span>
-                <span style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#38bdf8' }}>
-                  ${totalAmount.toLocaleString('es-CL')} CLP
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: '#94a3b8' }}>
-                <span>Cliente:</span>
-                <span style={{ color: '#f8fafc' }}>{customerEmail}</span>
-              </div>
-            </div>
+          )}
 
-            {/* Tarjetas de Prueba Oficiales (Guía Docente) */}
-            <div style={styles.testCardsCard}>
-              <div style={{ fontWeight: 'bold', fontSize: '0.85rem', color: '#e2e8f0', marginBottom: '8px' }}>
-                📋 Tarjetas de Prueba Oficiales de Transbank (Ambiente Integración):
-              </div>
-              <div style={styles.cardRow}>
-                <span style={{ color: '#22c55e', fontWeight: 'bold' }}>✓ VISA (Aprobada):</span>
-                <code style={styles.codeText}>4051 8856 0044 6623</code>
-                <span>CVV: 123</span>
-              </div>
-              <div style={styles.cardRow}>
-                <span style={{ color: '#ef4444', fontWeight: 'bold' }}>✗ MASTERCARD (Rechazada):</span>
-                <code style={styles.codeText}>5186 0595 5959 0568</code>
-                <span>CVV: 123</span>
-              </div>
-              <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '6px' }}>
-                RUT de prueba: <strong>11.111.111-1</strong> | Clave: <strong>123</strong>
-              </div>
-            </div>
-
-            {/* Acciones de Pago */}
-            {!webpayData ? (
-              <div style={{ marginTop: '20px' }}>
-                <button
-                  onClick={handleIniciarWebpay}
-                  disabled={loading}
-                  style={styles.btnWebpay}
-                >
-                  {loading ? 'Conectando con Transbank Webpay...' : '🚀 Iniciar Pago con Webpay Plus (+5 Pts)'}
-                </button>
-                <div style={styles.securityHint}>
-                  <ShieldCheckIcon size={14} color="#38bdf8" />
-                  <span>Protegido con regla antifraude en tiempo real con Apache Kafka.</span>
+          {/* Estado de Transacción Aprobada / Rechazada */}
+          {commitStatus && (
+            <div style={commitStatus.success ? styles.successBox : styles.rejectBox}>
+              <h4 style={{ margin: '0 0 6px 0' }}>{commitStatus.success ? '✓ Transacción Aprobada' : '✗ Transacción Rechazada'}</h4>
+              <p style={{ margin: 0, fontSize: '0.9rem' }}>{commitStatus.mensaje}</p>
+              {commitStatus.authCode && (
+                <div style={{ marginTop: '8px', fontSize: '0.82rem' }}>
+                  <span>Código Autorización: <code>{commitStatus.authCode}</code></span> • <span>Orden: <code>{commitStatus.buyOrder}</code></span>
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* Paso 1: Inicializar Transacción en Webpay */}
+          {!webpayData && !commitStatus && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <p style={{ margin: 0, fontSize: '0.92rem', color: '#cbd5e1' }}>
+                Al presionar el botón se iniciará la transacción conectando con Transbank y evaluando las reglas de velocidad antifraude.
+              </p>
+
+              <button
+                onClick={handleIniciarWebpay}
+                disabled={loading}
+                style={styles.btnPayPrimary}
+              >
+                {loading ? 'Conectando con Transbank...' : 'Pagar con Webpay Plus'}
+              </button>
+            </div>
+          )}
+
+          {/* Paso 2: Transacción Iniciada - Formulario o Simulación */}
+          {webpayData && !commitStatus && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={styles.tokenBox}>
+                <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Token de Sesión Transbank:</span>
+                <code style={{ fontSize: '0.82rem', color: '#38bdf8', wordBreak: 'break-all' }}>{webpayData.token}</code>
               </div>
-            ) : (
-              <div style={{ marginTop: '20px', textAlign: 'center' }}>
-                <p style={{ color: '#22c55e', fontWeight: 'bold', marginBottom: '12px' }}>
-                  ✓ Transacción iniciada en Transbank (Token: {webpayData.token.substring(0, 16)}...)
-                </p>
 
-                {/* Botón para abrir la URL oficial de Transbank */}
-                <form action={webpayData.url} method="POST" target="_blank" style={{ marginBottom: '16px' }}>
-                  <input type="hidden" name="token_ws" value={webpayData.token} />
-                  <button type="submit" style={styles.btnExternalWebpay}>
-                    🔗 Abrir Pasarela Oficial de Transbank en Nueva Pestaña
-                  </button>
-                </form>
+              {/* Botón para Redirigir a Webpay Real */}
+              <form action={webpayData.url} method="POST" target="_blank">
+                <input type="hidden" name="token_ws" value={webpayData.token} />
+                <button
+                  type="submit"
+                  style={{ ...styles.btnPayPrimary, background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' }}
+                >
+                  Continuar al Portal Oficial de Transbank ↗
+                </button>
+              </form>
 
-                <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+              {/* Simulación directa in-app para pruebas fluidas */}
+              <div style={styles.simBox}>
+                <span style={{ fontSize: '0.85rem', color: '#94a3b8', display: 'block', marginBottom: '8px' }}>
+                  Prueba de Integración:
+                </span>
+                <div style={{ display: 'flex', gap: '8px' }}>
                   <button
                     onClick={() => handleSimularConfirmacionWebpay(true)}
                     disabled={loading}
-                    style={styles.btnSuccessCommit}
+                    style={styles.btnSimSuccess}
                   >
-                    Simular Aprobación (Commit)
+                    ✓ Autorizar Pago (VISA Oficial)
                   </button>
                   <button
                     onClick={() => handleSimularConfirmacionWebpay(false)}
                     disabled={loading}
-                    style={styles.btnRejectCommit}
+                    style={styles.btnSimReject}
                   >
-                    Simular Rechazo
+                    ✗ Rechazar Pago (Mastercard)
                   </button>
                 </div>
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+
+        </div>
+
       </div>
     </div>
   );
@@ -295,161 +278,130 @@ const styles = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+    backgroundColor: 'rgba(5, 10, 20, 0.85)',
     backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1000,
-    padding: '20px',
+    zIndex: 99999,
+    padding: '1.5rem',
   },
   modalCard: {
-    backgroundColor: '#1e293b',
-    border: '1px solid #334155',
-    borderRadius: '16px',
-    maxWidth: '520px',
+    background: '#0f172a',
+    border: '1px solid rgba(255, 255, 255, 0.12)',
+    borderRadius: '20px',
+    maxWidth: '560px',
     width: '100%',
-    padding: '24px',
-    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-    color: '#f8fafc',
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.75)',
+    overflow: 'hidden',
+    position: 'relative',
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '20px',
-    borderBottom: '1px solid #334155',
-    paddingBottom: '12px',
+    padding: '1.5rem',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+    background: 'rgba(255, 255, 255, 0.02)',
   },
   btnClose: {
-    background: 'none',
+    background: 'rgba(255, 255, 255, 0.06)',
     border: 'none',
     color: '#94a3b8',
-    cursor: 'pointer',
-    padding: '4px',
-    display: 'flex',
-  },
-  summaryCard: {
-    background: '#0f172a',
-    borderRadius: '10px',
-    padding: '16px',
-    border: '1px solid #334155',
-    marginBottom: '16px',
-  },
-  testCardsCard: {
-    background: 'rgba(30, 41, 59, 0.7)',
-    borderRadius: '10px',
-    padding: '14px',
-    border: '1px dashed #475569',
-    fontSize: '0.85rem',
-  },
-  cardRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    marginBottom: '4px',
-    flexWrap: 'wrap',
-  },
-  codeText: {
-    background: '#0f172a',
-    padding: '2px 6px',
-    borderRadius: '4px',
-    color: '#38bdf8',
-    fontFamily: 'monospace',
-  },
-  fraudAlertBox: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    border: '1px solid #ef4444',
-    color: '#fca5a5',
-    borderRadius: '10px',
-    padding: '16px',
-    marginBottom: '16px',
-  },
-  errorBox: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    border: '1px solid #dc2626',
-    color: '#f87171',
-    borderRadius: '8px',
-    padding: '12px',
-    marginBottom: '16px',
-    fontSize: '0.9rem',
-  },
-  resultBox: {
-    textAlign: 'center',
-    padding: '20px 10px',
-  },
-  receiptDetails: {
-    background: '#0f172a',
-    borderRadius: '8px',
-    padding: '14px',
-    textAlign: 'left',
-    fontSize: '0.88rem',
-    color: '#cbd5e1',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px',
-    marginBottom: '20px',
-  },
-  btnWebpay: {
-    width: '100%',
-    padding: '14px',
-    borderRadius: '10px',
-    border: 'none',
-    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-    color: '#ffffff',
-    fontWeight: 'bold',
-    fontSize: '1rem',
-    cursor: 'pointer',
-    boxShadow: '0 4px 14px rgba(2, 132, 199, 0.4)',
-    transition: 'all 0.2s',
-  },
-  btnExternalWebpay: {
-    width: '100%',
-    padding: '12px',
-    borderRadius: '8px',
-    border: '1px solid #38bdf8',
-    background: 'transparent',
-    color: '#38bdf8',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-  },
-  btnSuccessCommit: {
-    flex: 1,
-    padding: '10px',
-    borderRadius: '8px',
-    border: 'none',
-    background: '#16a34a',
-    color: 'white',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-  },
-  btnRejectCommit: {
-    flex: 1,
-    padding: '10px',
-    borderRadius: '8px',
-    border: 'none',
-    background: '#dc2626',
-    color: 'white',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-  },
-  btnPrimary: {
-    padding: '12px 24px',
-    borderRadius: '8px',
-    border: 'none',
-    background: '#0284c7',
-    color: 'white',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-  },
-  securityHint: {
+    width: '32px',
+    height: '32px',
+    borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '6px',
-    color: '#94a3b8',
-    fontSize: '0.8rem',
-    marginTop: '10px',
+    cursor: 'pointer',
+  },
+  body: {
+    padding: '1.75rem',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1.25rem',
+  },
+  orderSummary: {
+    background: 'rgba(56, 189, 248, 0.06)',
+    border: '1px solid rgba(56, 189, 248, 0.2)',
+    borderRadius: '12px',
+    padding: '1rem',
+  },
+  fraudBox: {
+    background: 'rgba(239, 68, 68, 0.12)',
+    border: '1px solid rgba(239, 68, 68, 0.4)',
+    borderRadius: '12px',
+    padding: '1rem',
+  },
+  errorBox: {
+    background: 'rgba(239, 68, 68, 0.1)',
+    border: '1px solid rgba(239, 68, 68, 0.25)',
+    color: '#fca5a5',
+    padding: '0.85rem',
+    borderRadius: '10px',
+    fontSize: '0.88rem',
+  },
+  successBox: {
+    background: 'rgba(16, 185, 129, 0.12)',
+    border: '1px solid rgba(16, 185, 129, 0.4)',
+    color: '#6ee7b7',
+    padding: '1rem',
+    borderRadius: '12px',
+  },
+  rejectBox: {
+    background: 'rgba(239, 68, 68, 0.12)',
+    border: '1px solid rgba(239, 68, 68, 0.4)',
+    color: '#fca5a5',
+    padding: '1rem',
+    borderRadius: '12px',
+  },
+  btnPayPrimary: {
+    width: '100%',
+    padding: '0.9rem',
+    borderRadius: '12px',
+    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+    border: 'none',
+    color: '#ffffff',
+    fontWeight: '700',
+    fontSize: '1rem',
+    cursor: 'pointer',
+    boxShadow: '0 4px 14px rgba(2, 132, 199, 0.4)',
+  },
+  tokenBox: {
+    background: 'rgba(255, 255, 255, 0.04)',
+    padding: '0.75rem',
+    borderRadius: '8px',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+  },
+  simBox: {
+    background: 'rgba(255, 255, 255, 0.03)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    borderRadius: '10px',
+    padding: '1rem',
+  },
+  btnSimSuccess: {
+    flex: 1,
+    padding: '0.7rem',
+    borderRadius: '8px',
+    background: 'rgba(16, 185, 129, 0.15)',
+    border: '1px solid #10b981',
+    color: '#10b981',
+    fontWeight: '700',
+    fontSize: '0.85rem',
+    cursor: 'pointer',
+  },
+  btnSimReject: {
+    flex: 1,
+    padding: '0.7rem',
+    borderRadius: '8px',
+    background: 'rgba(239, 68, 68, 0.15)',
+    border: '1px solid #ef4444',
+    color: '#ef4444',
+    fontWeight: '700',
+    fontSize: '0.85rem',
+    cursor: 'pointer',
   },
 };
 

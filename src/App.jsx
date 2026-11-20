@@ -4,11 +4,10 @@ import LoginButton from './components/LoginButton';
 import Catalogo from './components/Catalogo';
 import Carrito from './components/Carrito';
 import OrderSuccessModal from './components/OrderSuccessModal';
-import CloudConsoleModal from './components/CloudConsoleModal';
 import MisComprasModal from './components/MisComprasModal';
 import WebpayModal from './components/WebpayModal';
-import RecomendacionesSection from './components/RecomendacionesSection';
-import LiveAnalyticsModal from './components/LiveAnalyticsModal';
+import ProductDetailModal from './components/ProductDetailModal';
+import CloudOpsView from './components/CloudOpsView';
 import { SearchIcon, CartIcon, CloseIcon, CloudIcon, QueueIcon, ShieldCheckIcon } from './components/Icons';
 import './App.css';
 
@@ -76,9 +75,15 @@ function App() {
     }
   }, []);
 
+  // Vistas principales: 'store' (Tienda) o 'cloudops' (Cloud Ops & Telemetría)
+  const [activeMainView, setActiveMainView] = useState('store');
+
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [searchTerm, setSearchTerm] = useState('');
   const [refreshStockCounter, setRefreshStockCounter] = useState(0);
+
+  // Modal de Detalle de Producto
+  const [selectedProductForDetail, setSelectedProductForDetail] = useState(null);
 
   const [cartItems, setCartItems] = useState([
     {
@@ -90,9 +95,7 @@ function App() {
     }
   ]);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [isCloudConsoleOpen, setIsCloudConsoleOpen] = useState(false);
   const [isComprasOpen, setIsComprasOpen] = useState(false);
-  const [isLiveAnalyticsOpen, setIsLiveAnalyticsOpen] = useState(false);
   const [webpayCheckoutData, setWebpayCheckoutData] = useState(null);
   const [completedOrderData, setCompletedOrderData] = useState(null);
 
@@ -159,79 +162,81 @@ function App() {
 
   return (
     <div className="app-container">
-      {/* 1. Header de la Tienda */}
+      {/* 1. Header de la Aplicación */}
       <header className="app-header">
         <div className="header-left">
           <div 
             className="logo-container" 
-            onClick={() => { setSelectedCategory('Todos'); setSearchTerm(''); }} 
+            onClick={() => { 
+              setActiveMainView('store');
+              setSelectedCategory('Todos'); 
+              setSearchTerm(''); 
+            }} 
             style={{ cursor: 'pointer' }}
           >
             <div className="logo-badge">360</div>
             <div className="logo-text-group">
               <h1>Pedidos360</h1>
-              <span className="logo-tagline">Cloud Native Store • EV3</span>
+              <span className="logo-tagline">Enterprise Cloud Store</span>
             </div>
           </div>
+
+          {/* Switch de Vistas: Tienda vs Cloud Ops */}
+          <nav className="header-nav-switcher">
+            <button
+              className={`nav-tab-btn ${activeMainView === 'store' ? 'active' : ''}`}
+              onClick={() => setActiveMainView('store')}
+            >
+              <span>🛍️</span>
+              <span>Tienda Online</span>
+            </button>
+            <button
+              className={`nav-tab-btn ${activeMainView === 'cloudops' ? 'active' : ''}`}
+              onClick={() => setActiveMainView('cloudops')}
+            >
+              <span className="live-dot-green"></span>
+              <span>⚡ Cloud Ops & Telemetría</span>
+            </button>
+          </nav>
         </div>
 
-        {/* Buscador Central */}
-        <div className="header-center">
-          <div className="search-bar-wrapper">
-            <span className="search-icon">
-              <SearchIcon size={18} color="var(--text-muted)" />
-            </span>
-            <input
-              type="text"
-              className="search-input"
-              placeholder="Buscar laptops gamer, periféricos, monitores..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            {searchTerm && (
-              <button 
-                className="clear-search-btn" 
-                onClick={() => setSearchTerm('')}
-                aria-label="Limpiar búsqueda"
-              >
-                <CloseIcon size={16} />
-              </button>
-            )}
+        {/* Buscador Central (Solo visible en la Tienda) */}
+        {activeMainView === 'store' && (
+          <div className="header-center">
+            <div className="search-bar-wrapper">
+              <span className="search-icon">
+                <SearchIcon size={18} color="var(--text-muted)" />
+              </span>
+              <input
+                type="text"
+                className="search-input"
+                placeholder="Buscar laptops, periféricos, monitores, audio..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              {searchTerm && (
+                <button 
+                  className="clear-search-btn" 
+                  onClick={() => setSearchTerm('')}
+                  aria-label="Limpiar búsqueda"
+                >
+                  <CloseIcon size={16} />
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Acciones del Header */}
         <div className="header-right">
-          {/* Botón Dashboard Live Analytics (WebSockets +3 Pts) */}
-          <button
-            className="cloud-console-nav-btn pulse-glow"
-            onClick={() => setIsLiveAnalyticsOpen(true)}
-            title="Abrir Dashboard de Telemetría en Vivo (WebSockets + Kafka)"
-            style={{ background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.2) 0%, rgba(56, 189, 248, 0.3) 100%)', border: '1px solid #38bdf8' }}
-          >
-            <span className="live-dot"></span>
-            <span style={{ fontSize: '1.1rem' }}>📊</span>
-            <span className="console-nav-text" style={{ color: '#38bdf8', fontWeight: 'bold' }}>Live Analytics</span>
-          </button>
-
-          {/* Botón Mis Compras Recientes (Sellos SHA-256) */}
+          {/* Botón Mis Compras (Sellos SHA-256) */}
           <button
             className="compras-nav-btn"
             onClick={() => setIsComprasOpen(true)}
-            title="Ver historial de compras y auditoría criptográfica"
+            title="Ver historial de compras y comprobantes de auditoría"
           >
             <ShieldCheckIcon size={16} color="#10b981" />
             <span className="compras-nav-text">Mis Compras</span>
-          </button>
-
-          {/* Consola de Operaciones RabbitMQ / Cloud Ops */}
-          <button
-            className="cloud-console-nav-btn"
-            onClick={() => setIsCloudConsoleOpen(true)}
-            title="Abrir Consola Cloud Ops: Clúster RabbitMQ, DLQs y Microservicios"
-          >
-            <QueueIcon size={16} color="#94a3b8" />
-            <span className="console-nav-text">Cloud Ops</span>
           </button>
 
           {/* Carrito de Compras */}
@@ -247,7 +252,7 @@ function App() {
             )}
           </button>
 
-          {/* Autenticación Azure Entra ID */}
+          {/* Autenticación Corporativa Azure Entra ID */}
           <div className="auth-section">
             {activeAccount ? (
               <div className="user-profile-menu">
@@ -273,53 +278,67 @@ function App() {
         </div>
       </header>
 
-      {/* 2. Hero Section Moderno & Limpio */}
-      <section className="store-hero">
-        <div className="hero-content">
-          <div className="hero-pill">
-            <span className="dot online"></span>
-            <span>Ecosistema Multi-Cloud • AWS & Microsoft Azure</span>
-          </div>
-          <h2>Hardware & Tecnología Cloud Native</h2>
-          <p>
-            Plataforma con <strong>Apache Kafka</strong> para streaming analítico en tiempo real, <strong>Webpay Plus REST (+5 pts)</strong> con regla antifraude, <strong>Amazon DynamoDB (+2 pts)</strong> y <strong>WebSockets (+3 pts)</strong>.
-          </p>
-          <div className="hero-badges-row">
-            <span className="tech-badge aws-chip">
-              <CloudIcon size={14} /> AWS Cloud Native
-            </span>
-            <span className="tech-badge" style={{ background: 'rgba(234, 88, 12, 0.15)', color: '#fb923c', border: '1px solid #ea580c' }}>
-              ⚡ Apache Kafka KRaft
-            </span>
-            <span className="tech-badge" style={{ background: 'rgba(2, 132, 199, 0.15)', color: '#38bdf8', border: '1px solid #0284c7' }}>
-              💳 Webpay Plus (+5 pts)
-            </span>
-            <span className="tech-badge rabbit-chip">
-              <QueueIcon size={14} /> RabbitMQ Transaccional
-            </span>
-          </div>
-        </div>
-      </section>
+      {/* 2. Renderizado Condicional de la Vista Principal */}
+      {activeMainView === 'cloudops' ? (
+        <main className="app-main">
+          <CloudOpsView />
+        </main>
+      ) : (
+        <>
+          {/* Hero Section Corporativo y Elegante */}
+          <section className="store-hero">
+            <div className="hero-content">
+              <div className="hero-pill">
+                <span className="dot online"></span>
+                <span>Plataforma Multi-Cloud • AWS & Microsoft Azure</span>
+              </div>
+              <h2>Hardware & E-Commerce de Alto Rendimiento</h2>
+              <p>
+                Equipamiento profesional respaldado por arquitectura orientada a eventos con <strong>Apache Kafka</strong>, pasarela oficial <strong>Transbank Webpay Plus</strong> y mensajería transaccional <strong>RabbitMQ</strong>.
+              </p>
+              <div className="hero-badges-row">
+                <span className="tech-badge aws-chip">
+                  <CloudIcon size={14} /> AWS Cloud Native
+                </span>
+                <span className="tech-badge" style={{ background: 'rgba(234, 88, 12, 0.15)', color: '#fb923c', border: '1px solid #ea580c' }}>
+                  ⚡ Apache Kafka KRaft
+                </span>
+                <span className="tech-badge" style={{ background: 'rgba(2, 132, 199, 0.15)', color: '#38bdf8', border: '1px solid #0284c7' }}>
+                  💳 Transbank Webpay Plus
+                </span>
+                <span className="tech-badge rabbit-chip">
+                  <QueueIcon size={14} /> RabbitMQ Clúster Resiliente
+                </span>
+              </div>
+            </div>
+          </section>
 
-      {/* 3. Sección de Recomendaciones Personalizadas (Apache Kafka) */}
-      <RecomendacionesSection
-        activeAccount={activeAccount}
+          {/* Catálogo Principal */}
+          <main className="app-main">
+            <Catalogo
+              selectedCategory={selectedCategory}
+              onSelectCategory={setSelectedCategory}
+              searchTerm={searchTerm}
+              onAddToCart={handleAddToCart}
+              cartItems={cartItems}
+              refreshTrigger={refreshStockCounter}
+              onOpenProductDetail={(product) => setSelectedProductForDetail(product)}
+            />
+          </main>
+        </>
+      )}
+
+      {/* 3. Modal de Ficha Técnica y Detalle del Producto (con Recomendaciones) */}
+      <ProductDetailModal
+        product={selectedProductForDetail}
+        isOpen={!!selectedProductForDetail}
+        onClose={() => setSelectedProductForDetail(null)}
         onAddToCart={handleAddToCart}
+        cartItems={cartItems}
+        onSelectProduct={(newProduct) => setSelectedProductForDetail(newProduct)}
       />
 
-      {/* 4. Catálogo Principal con Stock en Vivo */}
-      <main className="app-main">
-        <Catalogo
-          selectedCategory={selectedCategory}
-          onSelectCategory={setSelectedCategory}
-          searchTerm={searchTerm}
-          onAddToCart={handleAddToCart}
-          cartItems={cartItems}
-          refreshTrigger={refreshStockCounter}
-        />
-      </main>
-
-      {/* 5. Carrito de Compras (Drawer lateral) */}
+      {/* 4. Carrito de Compras (Drawer lateral) */}
       <Carrito
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
@@ -335,7 +354,7 @@ function App() {
         activeAccount={activeAccount}
       />
 
-      {/* 6. Modal de Pagos con Webpay Plus y Antifraude (EV3) */}
+      {/* 5. Modal de Pagos con Webpay Plus y Detección Antifraude */}
       <WebpayModal
         isOpen={!!webpayCheckoutData}
         onClose={() => setWebpayCheckoutData(null)}
@@ -353,42 +372,30 @@ function App() {
             },
             payload: pagoResult,
             timestamp: new Date().toISOString(),
-            metodo: 'Webpay Plus REST Oficial',
+            metodo: 'Transbank Webpay Plus',
           });
         }}
       />
 
-      {/* 7. Modal de Dashboard Live Analytics (WebSockets +3 Pts) */}
-      <LiveAnalyticsModal
-        isOpen={isLiveAnalyticsOpen}
-        onClose={() => setIsLiveAnalyticsOpen(false)}
-      />
-
-      {/* 8. Modal de Confirmación de Pedido */}
+      {/* 6. Modal de Confirmación de Pedido */}
       <OrderSuccessModal
         orderData={completedOrderData}
         onClose={() => setCompletedOrderData(null)}
       />
 
-      {/* 9. Modal de Mis Compras Recientes (Auditoría SHA-256) */}
+      {/* 7. Modal de Mis Compras Recientes (Auditoría SHA-256) */}
       <MisComprasModal
         isOpen={isComprasOpen}
         onClose={() => setIsComprasOpen(false)}
         activeAccount={activeAccount}
       />
 
-      {/* 10. Consola de Microservicios & RabbitMQ */}
-      <CloudConsoleModal
-        isOpen={isCloudConsoleOpen}
-        onClose={() => setIsCloudConsoleOpen(false)}
-      />
-
-      {/* 11. Footer */}
+      {/* 8. Footer Corporativo */}
       <footer className="app-footer">
         <div className="footer-content">
-          <p>© 2026 Pedidos360 Cloud Store • Evaluación 3 Desarrollo Cloud Native</p>
+          <p>© 2026 Pedidos360 Enterprise • Arquitectura Cloud Native & Streaming</p>
           <div className="footer-links">
-            <span>Perímetro: <code>AWS Cloud Native (Sin Proxies Caseros)</code></span>
+            <span>Perímetro: <code>AWS Native (Direct Multi-Port Architecture)</code></span>
           </div>
         </div>
       </footer>

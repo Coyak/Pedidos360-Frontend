@@ -1,80 +1,197 @@
 import React, { useState, useEffect } from 'react';
 import { pagoService } from '../services/pagoService';
-import { ShieldCheckIcon, CheckIcon, CloseIcon } from './Icons';
+import { analyticsService } from '../services/analyticsService';
+import { CheckIcon, CloseIcon } from './Icons';
 
 /**
  * Página de Retorno Oficial de Transbank Webpay Plus (/callback)
  * Consume el servicio pagoService.confirmarPago(token_ws),
- * manejando estados de loading, voucher aprobado, rechazo bancario y alertas antifraude (HTTP 429).
+ * registra las interacciones 'purchase' en ms-analytics y maneja estados 200, rechazo y 429.
  */
-export const WebpayCallbackPage = ({ token, onReturnHome, onReturnCloudOps }) => {
+export const WebpayCallbackPage = ({ token, onReturnHome, onReturnCloudOps, onRetryPayment, onClearCart }) => {
   const [loading, setLoading] = useState(true);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     const commitPayment = async () => {
       setLoading(true);
       setError(null);
 
-      // Extraer token_ws desde prop o desde URL query params
       let activeToken = token;
-      if (!activeToken && typeof window !== 'undefined') {
-        const params = new URLSearchParams(window.location.search);
-        activeToken = params.get('token_ws') || params.get('token');
+      let abortedToken = null;
+      let sessionId = null;
+      let orderId = null;
+
+      if (typeof window !== 'undefined') {
+        const searchParams = new URLSearchParams(window.location.search);
+        let hashQuery = '';
+        if (window.location.hash.includes('?')) {
+          hashQuery = window.location.hash.substring(window.location.hash.indexOf('?'));
+        }
+        const hashParams = new URLSearchParams(hashQuery);
+
+        if (!activeToken) {
+          activeToken = searchParams.get('token_ws') || hashParams.get('token_ws') || searchParams.get('token');
+        }
+        abortedToken = searchParams.get('TBK_TOKEN') || hashParams.get('TBK_TOKEN');
+        sessionId = searchParams.get('TBK_ID_SESION') || hashParams.get('TBK_ID_SESION');
+        orderId = searchParams.get('TBK_ORDEN_COMPRA') || hashParams.get('TBK_ORDEN_COMPRA');
       }
 
-      if (!activeToken) {
-        setError({
-          status: 'NO_TOKEN',
-          message: 'No se recibió un token de transacción válido desde la pasarela Webpay Plus.',
-        });
-        setLoading(false);
+      // Caso 1: Anulación voluntaria del usuario en Webpay Plus
+      if (!activeToken && abortedToken) {
+        if (isMounted) {
+          setError({
+            status: 'ABORTADO_USUARIO',
+            title: 'Pago Cancelado por el Usuario',
+            message: 'Cancelaste la transacción directamente en la pasarela de Transbank Webpay Plus.',
+            detail: `Token de anulación: ${abortedToken.substring(0, 18)}... No se ha realizado ningún cobro a tu tarjeta.`,
+          });
+          setLoading(false);
+        }
         return;
       }
 
+      // Caso 2: Timeout o cierre de sesión en Webpay Plus
+      if (!activeToken && (sessionId || orderId)) {
+        if (isMounted) {
+          setError({
+            status: 'TIMEOUT_USUARIO',
+            title: 'Tiempo de Sesión Expirado',
+            message: 'La sesión en Transbank Webpay Plus caducó por inactividad o la ventana fue cerrada.',
+            detail: `Sesión: ${sessionId || 'N/A'} • Orden: ${orderId || 'N/A'}. No se realizó ningún cobro.`,
+          });
+          setLoading(false);
+        }
+        return;
+      }
+
+      // Caso 3: Ningún token presente
+      if (!activeToken) {
+        if (isMounted) {
+          setError({
+            status: 'NO_TOKEN',
+            title: 'Token No Detectado',
+            message: 'No se recibió un token de transacción válido desde la pasarela Webpay Plus.',
+            detail: 'El comprobante ya fue consumido o la URL de retorno no contiene parámetros válidos.',
+          });
+          setLoading(false);
+        }
+        return;
+      }
+
+      // Caso 4: Intentar confirmación criptográfica en ms-pago
       try {
         const data = await pagoService.confirmarPago(activeToken);
 
         if (data.success || data.status === 'AUTHORIZED' || data.response_code === 0) {
-          setResult({
-            success: true,
-            buyOrder: data.buyOrder || data.buy_order || `OC-${Date.now().toString().slice(-6)}`,
-            authorizationCode: data.authorizationCode || data.authorization_code || '849201',
-            amount: data.amount || 1290000,
-            transactionDate: data.transactionDate || new Date().toLocaleString('es-CL'),
-            paymentTypeCode: data.paymentTypeCode || 'VN',
-            sharesNumber: data.sharesNumber || 0,
-            cardNumber: data.cardNumber || '•••• 6623',
-            accountingDate: data.accountingDate || '11-20',
-          });
+          if (isMounted) {
+            setResult({
+              success: true,
+              buyOrder: data.buyOrder || data.buy_order || `OC-${Date.now().toString().slice(-6)}`,
+              authorizationCode: data.authorizationCode || data.authorization_code || '849201',
+              amount: data.amount || 1290000,
+              transactionDate: data.transactionDate || new Date().toLocaleString('es-CL'),
+              paymentTypeCode: data.paymentTypeCode || 'VN',
+              sharesNumber: data.sharesNumber || 0,
+              cardNumber: data.cardNumber || '•••• 6623',
+              accountingDate: data.accountingDate || '11-20',
+            });
+          }
+
+          // Registrar evento 'purchase' en ms-analytics para cada ítem comprado y limpiar carrito
+          if (typeof window !== 'undefined') {
+            try {
+              const rawPending = sessionStorage.getItem('pedidos360_pending_checkout');
+              if (rawPending) {
+                const pending = JSON.parse(rawPending);
+                const clientId = pending.clientId || 'cliente@pedidos360.com';
+                const items = Array.isArray(pending.items) && pending.items.length > 0
+                  ? pending.items
+                  : [{ id: 'PROD-101', category: 'Laptops' }];
+
+                for (const item of items) {
+                  analyticsService.registrarInteraccion({
+                    clientId,
+                    itemId: item.id,
+                    action: 'purchase',
+                    category: item.category || 'Laptops',
+                    productType: 'Hardware',
+                  });
+                }
+                sessionStorage.removeItem('pedidos360_pending_checkout');
+              } else {
+                analyticsService.registrarInteraccion({
+                  clientId: 'cliente@pedidos360.com',
+                  itemId: 'PROD-101',
+                  action: 'purchase',
+                  category: 'Laptops',
+                  productType: 'Hardware',
+                });
+              }
+            } catch (err) {
+              console.warn("Error al registrar interacciones post-pago:", err);
+            }
+          }
+
+          if (typeof onClearCart === 'function') {
+            onClearCart();
+          }
         } else {
-          setError({
-            status: 'RECHAZADO',
-            message: data.mensaje || 'La transacción fue rechazada por la institución bancaria o cancelada por el usuario.',
-            detail: `Código de respuesta Transbank: ${data.response_code !== undefined ? data.response_code : -1}`,
-          });
+          // El banco emisor rechazó la tarjeta (ej. tarjeta 6624 saldo insuficiente, 6625 inválida, etc.)
+          if (isMounted) {
+            setError({
+              status: 'RECHAZADO',
+              title: 'Pago Rechazado por el Banco',
+              message: data.mensaje || 'La transacción fue rechazada por la institución emisora de la tarjeta.',
+              detail: `Código de respuesta Transbank: ${data.response_code !== undefined ? data.response_code : -1}. Los fondos no fueron debitados.`,
+            });
+          }
         }
       } catch (err) {
+        if (!isMounted) return;
+
         if (err.status === 429) {
           setError({
             status: 'BLOQUEO_FRAUDE_429',
+            title: 'Bloqueo Preventivo Antifraude (HTTP 429)',
             message: err.message || 'Transacción denegada por protocolo de seguridad antifraude (ráfagas sospechosas).',
             detail: 'Se ha impuesto un bloqueo temporal de 30 minutos a la cuenta de origen.',
           });
         } else {
+          const isAlreadyCommitted = err.message && (
+            err.message.toLowerCase().includes('already') ||
+            err.message.toLowerCase().includes('committed') ||
+            err.message.toLowerCase().includes('invalid status') ||
+            err.message.toLowerCase().includes('ya fue')
+          );
+
           setError({
-            status: 'NETWORK_ERROR',
-            message: 'Error de comunicación con el microservicio de Pagos.',
-            detail: err.message,
+            status: isAlreadyCommitted ? 'YA_PROCESADO' : 'NETWORK_ERROR',
+            title: isAlreadyCommitted ? 'Transacción Ya Confirmada' : 'Error en Verificación de Pago',
+            message: isAlreadyCommitted
+              ? 'Este token de Transbank ya fue confirmado previamente o la página fue recargada.'
+              : (err.message || 'Error de comunicación con el microservicio de Pagos.'),
+            detail: isAlreadyCommitted
+              ? 'Si tu pago fue aprobado, la orden ya quedó asentada en el clúster transaccional.'
+              : 'Verifica la conectividad con el microservicio de Pagos (:8085).',
           });
         }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     commitPayment();
+
+    return () => {
+      isMounted = false;
+    };
   }, [token]);
 
   return (
@@ -130,40 +247,81 @@ export const WebpayCallbackPage = ({ token, onReturnHome, onReturnCloudOps }) =>
             </div>
 
             <div style={cbStyles.actionGroup}>
-              <button style={cbStyles.btnPrimary} onClick={onReturnHome}>
+              <button style={cbStyles.btnPrimarySuccess} onClick={onReturnHome}>
                 🛍️ Volver a la Tienda
               </button>
               <button style={cbStyles.btnSecondary} onClick={onReturnCloudOps}>
-                ⚡ Ver Auditoría en Cloud Ops
+                ⚡ Ver Telemetría en Cloud Ops
               </button>
             </div>
           </div>
         )}
 
-        {/* Estado 3: Error / Bloqueo Antifraude */}
+        {/* Estado 3: Error / Cancelación / Rechazo / Bloqueo */}
         {!loading && error && (
           <div style={cbStyles.errorBox}>
-            <div style={cbStyles.iconCircleError}>
-              <CloseIcon size={36} color="#f43f5e" />
+            <div
+              style={
+                error.status === 'ABORTADO_USUARIO' || error.status === 'TIMEOUT_USUARIO'
+                  ? cbStyles.iconCircleWarning
+                  : cbStyles.iconCircleError
+              }
+            >
+              {error.status === 'ABORTADO_USUARIO' || error.status === 'TIMEOUT_USUARIO' ? (
+                <span style={{ fontSize: '30px' }}>↩️</span>
+              ) : (
+                <CloseIcon size={36} color="#f43f5e" />
+              )}
             </div>
 
-            <div style={cbStyles.badgeError}>
-              {error.status === 'BLOQUEO_FRAUDE_429' ? '🛡️ ALERTA ANTIFRAUDE (HTTP 429)' : 'TRANSACCIÓN NO COMPLETADA'}
+            <div
+              style={
+                error.status === 'ABORTADO_USUARIO' || error.status === 'TIMEOUT_USUARIO'
+                  ? cbStyles.badgeWarning
+                  : cbStyles.badgeError
+              }
+            >
+              {error.status === 'BLOQUEO_FRAUDE_429'
+                ? '🛡️ ALERTA ANTIFRAUDE (HTTP 429)'
+                : error.status === 'ABORTADO_USUARIO'
+                ? 'COMPRA ANULADA POR EL USUARIO'
+                : error.status === 'TIMEOUT_USUARIO'
+                ? 'SESIÓN EXPIRADA'
+                : error.status === 'RECHAZADO'
+                ? 'TRANSACCIÓN RECHAZADA'
+                : error.status === 'YA_PROCESADO'
+                ? 'ESTADO DEL COMPROBANTE'
+                : 'TRANSACCIÓN NO COMPLETADA'}
             </div>
 
-            <h2 style={cbStyles.title}>
-              {error.status === 'BLOQUEO_FRAUDE_429' ? 'Bloqueo Preventivo de Seguridad' : 'No se pudo procesar el pago'}
-            </h2>
+            <h2 style={cbStyles.title}>{error.title || 'No se pudo procesar el pago'}</h2>
 
             <p style={cbStyles.errorMessage}>{error.message}</p>
             {error.detail && <p style={cbStyles.errorDetail}>{error.detail}</p>}
 
             <div style={cbStyles.actionGroup}>
-              <button style={cbStyles.btnPrimary} onClick={onReturnHome}>
-                Intentar Nuevamente
+              {/* Si fue cancelado o rechazado, permitir reintentar de inmediato abriendo el carrito */}
+              {(error.status === 'ABORTADO_USUARIO' || error.status === 'TIMEOUT_USUARIO' || error.status === 'RECHAZADO') && (
+                <button
+                  style={cbStyles.btnPrimary}
+                  onClick={() => {
+                    if (typeof onRetryPayment === 'function') {
+                      onRetryPayment();
+                    } else {
+                      onReturnHome();
+                    }
+                  }}
+                >
+                  🛒 Reintentar Pago (Abrir Carrito)
+                </button>
+              )}
+
+              <button style={cbStyles.btnSecondary} onClick={onReturnHome}>
+                🛍️ Volver a la Tienda
               </button>
-              <button style={cbStyles.btnSecondary} onClick={onReturnCloudOps}>
-                Consultar Estado en Cloud Ops
+
+              <button style={cbStyles.btnTertiary} onClick={onReturnCloudOps}>
+                ⚡ Consultar Estado en Cloud Ops
               </button>
             </div>
           </div>
@@ -179,16 +337,16 @@ const cbStyles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '2rem 1rem',
+    padding: '2.5rem 1rem',
   },
   card: {
     background: '#0b1329',
-    border: '1px solid rgba(56, 189, 248, 0.2)',
+    border: '1px solid rgba(56, 189, 248, 0.25)',
     borderRadius: '20px',
     maxWidth: '560px',
     width: '100%',
     padding: '2.5rem',
-    boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.7)',
+    boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.85), 0 0 30px rgba(56, 189, 248, 0.1)',
     textAlign: 'center',
   },
   loadingBox: {
@@ -228,6 +386,17 @@ const cbStyles = {
     justifyContent: 'center',
     margin: '0 auto 1.25rem auto',
   },
+  iconCircleWarning: {
+    width: '72px',
+    height: '72px',
+    borderRadius: '50%',
+    background: 'rgba(234, 179, 8, 0.15)',
+    border: '2px solid rgba(234, 179, 8, 0.4)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: '0 auto 1.25rem auto',
+  },
   badgeSuccess: {
     display: 'inline-block',
     background: 'rgba(16, 185, 129, 0.2)',
@@ -243,6 +412,17 @@ const cbStyles = {
     display: 'inline-block',
     background: 'rgba(244, 63, 94, 0.2)',
     color: '#fb7185',
+    fontSize: '0.75rem',
+    fontWeight: '800',
+    letterSpacing: '0.08em',
+    padding: '4px 12px',
+    borderRadius: '20px',
+    marginBottom: '0.75rem',
+  },
+  badgeWarning: {
+    display: 'inline-block',
+    background: 'rgba(234, 179, 8, 0.2)',
+    color: '#facc15',
     fontSize: '0.75rem',
     fontWeight: '800',
     letterSpacing: '0.08em',
@@ -289,7 +469,7 @@ const cbStyles = {
   voucherPrice: {
     color: '#38bdf8',
     fontWeight: '800',
-    fontSize: '1.1rem',
+    fontSize: '1.15rem',
   },
   errorMessage: {
     color: '#fca5a5',
@@ -298,9 +478,14 @@ const cbStyles = {
     margin: '0 0 0.5rem 0',
   },
   errorDetail: {
-    color: '#64748b',
+    color: '#94a3b8',
     fontSize: '0.82rem',
+    lineHeight: '1.4',
     margin: '0 0 1.5rem 0',
+    padding: '0.65rem 0.85rem',
+    background: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: '8px',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
   },
   actionGroup: {
     display: 'flex',
@@ -308,9 +493,21 @@ const cbStyles = {
     gap: '0.75rem',
     marginTop: '1.5rem',
   },
+  btnPrimarySuccess: {
+    background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+    border: '1px solid rgba(52, 211, 153, 0.5)',
+    color: '#ffffff',
+    padding: '0.85rem 1.5rem',
+    borderRadius: '12px',
+    fontWeight: '700',
+    fontSize: '0.95rem',
+    cursor: 'pointer',
+    boxShadow: '0 4px 16px rgba(16, 185, 129, 0.4)',
+    transition: 'transform 0.2s, box-shadow 0.2s',
+  },
   btnPrimary: {
     background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-    border: 'none',
+    border: '1px solid #38bdf8',
     color: '#ffffff',
     padding: '0.85rem 1.5rem',
     borderRadius: '12px',
@@ -321,14 +518,26 @@ const cbStyles = {
     transition: 'transform 0.2s',
   },
   btnSecondary: {
-    background: 'rgba(255, 255, 255, 0.05)',
-    border: '1px solid rgba(255, 255, 255, 0.12)',
+    background: 'rgba(255, 255, 255, 0.06)',
+    border: '1px solid rgba(255, 255, 255, 0.15)',
     color: '#cbd5e1',
     padding: '0.85rem 1.5rem',
     borderRadius: '12px',
     fontWeight: '600',
     fontSize: '0.9rem',
     cursor: 'pointer',
+    transition: 'background 0.2s, color 0.2s',
+  },
+  btnTertiary: {
+    background: 'transparent',
+    border: '1px solid rgba(56, 189, 248, 0.25)',
+    color: '#38bdf8',
+    padding: '0.75rem 1.25rem',
+    borderRadius: '12px',
+    fontWeight: '600',
+    fontSize: '0.88rem',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
   },
 };
 

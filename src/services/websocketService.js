@@ -2,8 +2,8 @@ import { getApiEndpoints } from '../config/apiConfig';
 
 /**
  * Gestor de Conexión WebSocket en Tiempo Real (+3 Puntos Extra)
- * Provee reconexión automática, emisión de estados (conectado, desconectado, reconectando)
- * y despacho de telemetría de eventos analíticos y alertas antifraude.
+ * Compatible tanto con Spring STOMP (/ws-analytics-raw -> suscripción a /topic/metricas)
+ * como con frames JSON directos, con reconexión automática y estado visual.
  */
 class WebSocketService {
   constructor() {
@@ -29,7 +29,7 @@ class WebSocketService {
   }
 
   /**
-   * Inicia la conexión con el servidor WebSocket
+   * Inicia la conexión con el servidor WebSocket y negocia suscripción STOMP a /topic/metricas
    */
   connect(clientId) {
     if (typeof window === 'undefined' || typeof WebSocket === 'undefined') return;
@@ -49,14 +49,53 @@ class WebSocketService {
           clearTimeout(this.reconnectTimer);
           this.reconnectTimer = null;
         }
+
+        // Enviar handshake STOMP CONNECT para endpoints Spring @EnableWebSocketMessageBroker
+        try {
+          const connectFrame = 'CONNECT\naccept-version:1.2,1.1,1.0\nheart-beat:10000,10000\n\n\0';
+          this.socket.send(connectFrame);
+        } catch {
+          // Si es un servidor WebSocket raw que ignora STOMP, continúa conectado
+        }
       };
 
       this.socket.onmessage = (event) => {
+        const rawData = typeof event.data === 'string' ? event.data : '';
+        if (!rawData || rawData === '\n' || rawData === '\r\n') {
+          return; // Heartbeat frame
+        }
+
+        // 1. Respuesta STOMP CONNECTED -> suscribirse inmediatamente a /topic/metricas
+        if (rawData.startsWith('CONNECTED')) {
+          try {
+            const subFrame = 'SUBSCRIBE\nid:sub-metricas-0\ndestination:/topic/metricas\n\n\0';
+            this.socket.send(subFrame);
+          } catch {}
+          return;
+        }
+
+        // 2. Frame STOMP MESSAGE (destination:/topic/metricas)
+        if (rawData.startsWith('MESSAGE')) {
+          const bodySeparatorIdx = rawData.indexOf('\n\n');
+          if (bodySeparatorIdx !== -1) {
+            const jsonBody = rawData.substring(bodySeparatorIdx + 2).replace(/\0/g, '').trim();
+            if (jsonBody) {
+              try {
+                const parsed = JSON.parse(jsonBody);
+                this.notifyMessage(parsed);
+                return;
+              } catch {}
+            }
+          }
+        }
+
+        // 3. Fallback: mensaje WebSocket JSON directo
         try {
-          const data = JSON.parse(event.data);
+          const cleanJson = rawData.replace(/\0/g, '').trim();
+          const data = JSON.parse(cleanJson);
           this.notifyMessage(data);
         } catch {
-          this.notifyMessage({ raw: event.data });
+          // Ignorar otros frames de control STOMP (RECEIPT, etc.)
         }
       };
 

@@ -1,29 +1,32 @@
 /**
  * Configuración Centralizada de Endpoints Multi-Nube (Pedidos360 Enterprise)
- * RESTRICCIÓN DE EVALUACIÓN 3: Prohibido hardcodear localhost.
  * Todos los endpoints se resuelven dinámicamente vía variables de entorno (VITE_*)
- * o mediante el origen activo de la red (AWS EC2 / API Gateway).
+ * o mediante el origen activo de la red remota (AWS EC2 / CloudFront / API Gateway).
  */
 
 // 1. Detección del host remoto activo
 export const getActiveHost = () => {
+  const configuredHost = import.meta.env?.VITE_REMOTE_HOST;
+  if (configuredHost && configuredHost.trim() !== '') {
+    return configuredHost.trim();
+  }
   if (typeof window !== 'undefined' && window.location.hostname) {
     return window.location.hostname;
   }
-  return '127.0.0.1';
+  return 'pedidos360.cloud';
 };
 
 // 2. AWS API Gateway Perimetral
-export const AWS_API_GATEWAY_URL = 
+export const AWS_API_GATEWAY_URL =
   import.meta.env?.VITE_API_GATEWAY_URL || 'https://op6erfwwmh.execute-api.us-east-1.amazonaws.com/v1';
 
-// 3. Resolución dinámica de microservicios sin localhost hardcodeado
+// 3. Resolución dinámica de microservicios parametrizada por variables VITE_*
 export const getApiEndpoints = () => {
   const host = getActiveHost();
   const protocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'https:' : 'http:';
   const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
 
-  // Base URLs desde variables de entorno VITE_* con fallback dinámico
+  // Base URLs desde variables de entorno VITE_* con resolución dinámica sobre el host activo
   const catalogoBase = import.meta.env?.VITE_CATALOGO_API_URL || `${protocol}//${host}:8080`;
   const carritoBase = import.meta.env?.VITE_CARRITO_API_URL || `${protocol}//${host}:8081`;
   const notificacionesBase = import.meta.env?.VITE_NOTIFICACIONES_API_URL || `${protocol}//${host}:8082`;
@@ -70,7 +73,10 @@ export const getApiEndpoints = () => {
     // 7. Analítica, Kafka & Recomendaciones (:8086)
     analyticsStatus: `${analyticsBase}/api/recomendaciones/status`,
     analyticsRecomendaciones: `${analyticsBase}/api/recomendaciones`,
-    analyticsInteraccion: `${analyticsBase}/api/interacciones`,
+    analyticsInteraccion: `${analyticsBase}/api/recomendaciones/interaccion`,
+    analyticsMetricas: `${analyticsBase}/api/recomendaciones/metricas`,
+    analyticsAlertaFraude: `${analyticsBase}/api/recomendaciones/alerta-fraude`,
+    analyticsEmitirMetricas: `${analyticsBase}/api/recomendaciones/emitir-metricas`,
     analyticsWs: wsUrl,
   };
 };

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { pagoService } from '../services/pagoService';
+import { analyticsService } from '../services/analyticsService';
 import { CloseIcon, ShieldCheckIcon } from './Icons';
 
 /**
@@ -30,23 +31,50 @@ export const WebpayModal = ({
 
     const clientId = customerEmail || 'cliente@pedidos360.com';
     const returnUrl = typeof window !== 'undefined' ? `${window.location.origin}/callback` : '/callback';
+    const transactionId = `TX-${Date.now()}-${Math.random().toString(36).substring(7).toUpperCase()}`;
 
     try {
       const data = await pagoService.iniciarPago({
         clientId,
         amount: totalAmount,
-        transactionId: `TX-${Date.now()}-${Math.random().toString(36).substring(7).toUpperCase()}`,
+        transactionId,
         returnUrl,
       });
+
+      // Guardar contexto del pedido en sessionStorage para registrar evento 'purchase' al volver a /callback
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem(
+            'pedidos360_pending_checkout',
+            JSON.stringify({
+              clientId,
+              transactionId: data.transactionId || transactionId,
+              totalAmount,
+              items: cartItems.map((i) => ({
+                id: i.id,
+                name: i.name,
+                price: i.price,
+                quantity: i.quantity,
+                category: i.category || 'Hardware',
+              })),
+            })
+          );
+        } catch {}
+      }
 
       setWebpayData(data); // Contiene { url, token, transactionId }
     } catch (err) {
       if (err.status === 429) {
         // Bloqueo preventivo por regla antifraude (>3 intentos en 10 seg)
+        const msg = err.message || 'Se detectaron más de 3 transacciones en menos de 10 segundos. La cuenta ha sido bloqueada temporalmente por 30 minutos.';
         setFraudAlert({
           titulo: '🚨 BLOQUEO PREVENTIVO DE SEGURIDAD (HTTP 429)',
-          mensaje: err.message || 'Se detectaron más de 3 transacciones en menos de 10 segundos. La cuenta ha sido bloqueada temporalmente por 30 minutos.',
+          mensaje: msg,
           detalles: 'Protocolo de protección contra ataques de fuerza bruta y transacciones repetitivas.',
+        });
+        analyticsService.registrarAlertaFraude({
+          clientId,
+          razon: `Bloqueo 429 en Checkout Webpay: ${msg}`,
         });
       } else {
         setErrorMessage(err.message || 'No se pudo conectar con el microservicio de Pagos.');
@@ -64,7 +92,7 @@ export const WebpayModal = ({
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-container webpay-modal-box" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-card webpay-modal-box" onClick={(e) => e.stopPropagation()}>
         {/* Encabezado */}
         <div className="modal-header">
           <div className="modal-title-group">
@@ -124,10 +152,10 @@ export const WebpayModal = ({
           {webpayData && (
             <div className="webpay-ready-box">
               <div className="webpay-ready-icon">
-                <ShieldCheckIcon size={32} color="#10b981" />
+                <ShieldCheckIcon size={28} color="#10b981" />
               </div>
               <h4>Token de Transacción Generado</h4>
-              <p>Tu orden ha sido registrada en el clúster transaccional. Haz clic abajo para ser redirigido a Transbank Webpay Plus.</p>
+              <p>Tu orden ha sido registrada en el clúster transaccional. Haz clic en el botón verde abajo para ir a Transbank Webpay Plus.</p>
               <div className="token-display">
                 <code>token_ws: {webpayData.token.substring(0, 24)}...</code>
               </div>
@@ -136,8 +164,8 @@ export const WebpayModal = ({
         </div>
 
         {/* Acciones */}
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose} disabled={loading}>
+        <div className="modal-footer webpay-modal-footer">
+          <button className="btn btn-secondary btn-cancel-webpay" onClick={onClose} disabled={loading}>
             Cancelar
           </button>
 
@@ -151,7 +179,7 @@ export const WebpayModal = ({
             </button>
           ) : (
             <button
-              className="btn btn-success btn-pay-webpay"
+              className="btn btn-success btn-pay-webpay btn-redirect-transbank"
               onClick={handleRedirigirPasarelaOficial}
             >
               🚀 Redirigir a Pasarela Transbank (POST)

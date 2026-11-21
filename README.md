@@ -1,66 +1,70 @@
-# Pedidos360 - Frontend Client
+# Pedidos360 - Frontend Client (SPA React 18 + Vite)
 
-Aplicación web frontend para la plataforma de gestión de pedidos **Pedidos360**, desarrollada como parte del proyecto de evaluación universitaria para la asignatura de Desarrollo Cloud.
+Aplicación web empresarial Single Page Application (SPA) para la plataforma **Pedidos360**, actualizada y optimizada para la **Evaluación 3** de Desarrollo Cloud. Cumple con la regla crítica de **CERO DEPENDENCIAS DE LOCALHOST** en el despliegue y construcción para producción.
 
-## 🚀 Descripción del Proyecto
+---
 
-Pedidos360 Frontend es la interfaz de usuario basada en Single Page Application (SPA) que interactúa con la arquitectura de microservicios alojada en AWS. Permite a los usuarios autenticarse mediante Microsoft Entra ID (Azure AD), consumir servicios de API Gateway protegidos mediante tokens JWT (Bearer Tokens) y gestionar el flujo de catálogo y pedidos de compra en tiempo real.
+## 🚀 Alcance de la Evaluación 3
 
-## ✨ Características
+* **Autenticación Multi-Cloud:** Integración con Microsoft Entra ID (Azure AD) mediante `@azure/msal-browser` y `@azure/msal-react`, capturando claims del usuario y transmitiendo tokens JWT en `Authorization: Bearer <token>`.
+* **Pasarela Oficial Transbank Webpay Plus:** Modal de checkout en tema oscuro con redirección oficial por formulario `POST` con `token_ws` hacia `https://webpay3gint.transbank.cl`.
+* **Flujo de Retorno Robusto (/callback):** Pantalla de confirmación con voucher electrónico oficial, manejo de tarjetas de prueba (`6623` aprobada, `6624` fondos insuficientes), detección de cancelaciones de usuario (`TBK_TOKEN`), recargas seguras y limpieza de historial para evitar bucles.
+* **Detección y Visualización Antifraude (HTTP 429):** Banner visual de alerta de seguridad ante ráfagas (`>3 intentos en <10s`), deshabilitación de botones y emisión de trazas hacia `ms-analytics`.
+* **Centro CloudOps 360 & Telemetría en Tiempo Real (+3 pts):** Dashboard dividido por pestañas activas (`Resumen Ejecutivo`, `Microservicios`, `Streaming Kafka`, `Demanda & Top 5`, `Seguridad & 429`, `Clúster RabbitMQ`) con conexión WebSocket remota (`/ws-analytics-raw`).
+* **Motor de Recomendaciones Dinámicas:** Sección de recomendaciones en catálogo alimentada por interacciones del usuario (`view`, `cart`, `purchase`) sincronizada con `ms-analytics`.
+* **Cero Localhost:** Todos los endpoints se parametrizan mediante `VITE_*` y se inyectan en el `Dockerfile` como `ARG`/`ENV` durante `npm run build`.
 
-- **Autenticación Empresarial con Azure AD**: Integración completa con Microsoft Entra ID mediante los SDKs oficiales `@azure/msal-browser` y `@azure/msal-react`.
-- **Integración con AWS HTTP API Gateway (JWT Authorizer Nativo)**: Conexión directa a la API HTTP Gateway (`https://op6erfwwmh.execute-api.us-east-1.amazonaws.com`) con validación de tokens JWT en la capa perimetral (Edge).
-- **Módulo de Catálogo & Módulo de Carrito**:
-  - `<Catalogo />`: Consulta de disponibilidad de servicios de Catálogo (`GET /v1/api/status`).
-  - `<Carrito />`: Registro de pedidos de compra en tiempo real (`POST /v1/api/carrito/pedidos`) que interactúa con el microservicio desacoplado en puerto 8081.
-- **Control de Estado de Autenticación**: Renderizado condicional con `<MsalProvider>`, `<AuthenticatedTemplate>` y `<UnauthenticatedTemplate>`.
-- **Arquitectura SPA de Alto Rendimiento**: Desarrollada con React 18 y empacada con Vite.
+---
 
-## 🛠️ Tecnologías Utilizadas
+## ⚙️ Variables de Entorno (Vite)
 
-- **Core Framework:** [React 18](https://react.dev/) + [Vite](https://vitejs.dev/)
-- **Autenticación & Seguridad:** [@azure/msal-browser](https://www.npmjs.com/package/@azure/msal-browser) & [@azure/msal-react](https://www.npmjs.com/package/@azure/msal-react) (OAuth 2.0 / OIDC con Microsoft Entra ID)
-- **Backend & Cloud:** AWS HTTP API Gateway / Microservicios Spring Boot (`Catálogo` y `Carrito`)
-- **Lenguaje & Estilos:** JavaScript (ES6+) / JSX / Vanilla CSS (Modern Design System)
+Configurables en `Pedidos360-Frontend/.env` o inyectadas en Docker:
 
-## ⚙️ Configuración y Requisitos Previos
+```bash
+# Host Remoto o Dominio Cloud
+VITE_REMOTE_HOST=<IP_PUBLICA_EC2>
 
-1. **Node.js**: Asegúrate de tener instalado Node.js (versión 18 o superior).
-2. **Azure AD / Microsoft Entra ID App Registration**:
-   - Application (Client) ID configurado: `5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4`.
-   - Tenant ID configurado: `e5372bf0-c5e3-4286-887c-79069f209c1f`.
-   - Scope expuesto para autorización: `5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4/.default`.
+# Microsoft Entra ID (Azure AD)
+VITE_AZURE_CLIENT_ID=5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4
+VITE_AZURE_TENANT_ID=e5372bf0-c5e3-4286-887c-79069f209c1f
+VITE_AZURE_REDIRECT_URI=https://<DOMINIO_HTTPS>
 
-## 📦 Instalación y Ejecución Local
+# Endpoints Remotos de Microservicios en AWS
+VITE_CATALOGO_API_URL=http://<IP_PUBLICA_EC2>:8080
+VITE_CARRITO_API_URL=http://<IP_PUBLICA_EC2>:8081
+VITE_NOTIFICACIONES_API_URL=http://<IP_PUBLICA_EC2>:8082
+VITE_AUDITORIA_API_URL=http://<IP_PUBLICA_EC2>:8083
+VITE_ADMIN_API_URL=http://<IP_PUBLICA_EC2>:8084
+VITE_PAGOS_API_URL=http://<IP_PUBLICA_EC2>:8085
+VITE_RECOMENDACIONES_API_URL=http://<IP_PUBLICA_EC2>:8086
+VITE_WS_URL=ws://<IP_PUBLICA_EC2>:8086/ws-analytics-raw
+VITE_API_GATEWAY_URL=https://op6erfwwmh.execute-api.us-east-1.amazonaws.com/v1
+```
 
-1. **Ingresar al directorio del proyecto**:
-   ```bash
-   cd Pedidos360-Frontend
-   ```
+---
 
-2. **Instalar dependencias**:
-   ```bash
-   npm install
-   ```
+## 🛠️ Comandos de Construcción y Ejecución
 
-3. **Iniciar el servidor de desarrollo**:
-   ```bash
-   npm run dev
-   ```
-   La aplicación estará disponible por defecto en `http://localhost:5173`.
+```bash
+# 1. Instalar dependencias
+npm install
 
-4. **Construir para producción**:
-   ```bash
-   npm run build
-   ```
+# 2. Servidor de desarrollo
+npm run dev
+
+# 3. Compilación de producción (bundle validado sin localhost)
+npm run build
+```
+
+---
 
 ## 🏷️ Versionamiento Semántico
 
-Este proyecto sigue la especificación de **Semantic Versioning 2.0.0 (SemVer)**:
-- **v1.4.0**: Rediseño visual integral de la UI con sistema de diseño moderno, catálogo interactivo con búsqueda y filtros por categoría, drawer lateral para carrito de compras y modal interactivo de confirmación de pedido con trazabilidad técnica de AWS API Gateway y Microsoft Entra ID (HTTP 201 Created y token JWT).
-- **v1.3.0**: Incorporación del componente `<Carrito />` para el registro transaccional de pedidos de compra mediante peticiones `POST /v1/api/carrito/pedidos` con tokens JWT autorizados.
-- **v1.2.2 (Patch Fix)**: Migración de endpoint de consulta a la nueva API HTTP Gateway en AWS (`https://op6erfwwmh.execute-api.us-east-1.amazonaws.com/v1/api/status`).
-- **v1.2.1**: Corrección de scope MSAL a `5f5ad1dc-7259-4d00-a29d-75f1c2b3b2f4/.default`.
-- **v1.2.0**: Consumo seguro del API Gateway en AWS mediante tokens JWT autorizados en el header `Authorization: Bearer <token>` a través del componente `<Catalogo />`.
-- **v1.1.0**: Integración de `MsalProvider`, creación del componente `LoginButton` y flujo de inicio de sesión con Azure AD (MSAL).
-- **v1.0.0**: Estructura base inicial con React, Vite y configuración de autenticación MSAL.
+* **v3.2.0 (Evaluación 3 Final):**
+  * Integración completa de Transbank Webpay Plus y `/callback` con control de `TBK_TOKEN` y rechazos bancarios.
+  * Centro CloudOps con tabs independientes y WebSocket streaming en tiempo real.
+  * Inyección dinámica de `VITE_*` en `Dockerfile` de producción.
+  * Eliminación estricta de referencias `localhost` y `127.0.0.1` en todo el bundle cliente.
+* **v3.0.0:** Incorporación de `ms-pago` y `ms-analytics` con eventos Kafka.
+* **v2.0.0:** Integración de clúster RabbitMQ, auditoría SHA-256 y notificaciones SMTP reales.
+* **v1.0.0:** Estructura base inicial con React 18, Vite y autenticación MSAL.

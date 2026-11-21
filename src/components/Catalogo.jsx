@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { initialProducts, categories } from '../data/products';
 import { StarIcon, CheckIcon, EmptyBoxIcon, RefreshIcon } from './Icons';
 import { getApiEndpoints } from '../config/apiConfig';
+import { analyticsService } from '../services/analyticsService';
 
 /**
  * Catálogo Principal de Productos - Pedidos360 Enterprise Store
@@ -16,6 +17,7 @@ export const Catalogo = ({
   cartItems = [],
   refreshTrigger,
   onOpenProductDetail,
+  activeAccount,
 }) => {
   const [productsList, setProductsList] = useState(initialProducts);
   const [loading, setLoading] = useState(false);
@@ -81,20 +83,14 @@ export const Catalogo = ({
 
   const handleAddToCartWithKafka = (product) => {
     onAddToCart(product);
-    try {
-      fetch(endpoints.analyticsInteraccion, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clientId: 'cliente@pedidos360.com',
-          itemId: product.id,
-          action: 'cart',
-          category: product.category,
-          productType: 'Hardware',
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-    } catch {}
+    const currentClientId = activeAccount?.username || activeAccount?.name || 'cliente@pedidos360.com';
+    analyticsService.registrarInteraccion({
+      clientId: currentClientId,
+      itemId: product.id,
+      action: 'cart',
+      category: product.category,
+      productType: 'Hardware',
+    });
   };
 
   const handleCardClick = (product) => {

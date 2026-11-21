@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { initialProducts } from '../data/products';
-import { getApiEndpoints } from '../config/apiConfig';
+import { analyticsService } from '../services/analyticsService';
 import { StarIcon, CheckIcon, CartIcon, ShieldCheckIcon, RefreshIcon } from './Icons';
 
 export const ProductDetailPage = ({
@@ -8,11 +8,12 @@ export const ProductDetailPage = ({
   onNavigate,
   onAddToCart,
   cartItems = [],
+  activeAccount,
 }) => {
   const [product, setProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [addedAnimation, setAddedAnimation] = useState(false);
-  const endpoints = getApiEndpoints();
+  const currentClientId = activeAccount?.username || activeAccount?.name || 'cliente@pedidos360.com';
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -21,24 +22,17 @@ export const ProductDetailPage = ({
     setQuantity(1);
     setAddedAnimation(false);
 
-    // Enviar evento de vista a Apache Kafka
+    // Enviar evento de vista a Apache Kafka con el usuario autenticado
     if (found) {
-      try {
-        fetch(endpoints.analyticsInteraccion, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            clientId: 'cliente@pedidos360.com',
-            itemId: found.id,
-            action: 'view',
-            category: found.category,
-            productType: 'Hardware',
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-      } catch {}
+      analyticsService.registrarInteraccion({
+        clientId: currentClientId,
+        itemId: found.id,
+        action: 'view',
+        category: found.category,
+        productType: 'Hardware',
+      });
     }
-  }, [productId]);
+  }, [productId, currentClientId]);
 
   if (!product) return null;
 
@@ -59,21 +53,14 @@ export const ProductDetailPage = ({
     for (let i = 0; i < quantity; i++) {
       onAddToCart(product);
     }
-    // Enviar evento 'cart' a Apache Kafka
-    try {
-      fetch(endpoints.analyticsInteraccion, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clientId: 'cliente@pedidos360.com',
-          itemId: product.id,
-          action: 'cart',
-          category: product.category,
-          productType: 'Hardware',
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-    } catch {}
+    // Enviar evento 'cart' a Apache Kafka con el usuario autenticado
+    analyticsService.registrarInteraccion({
+      clientId: currentClientId,
+      itemId: product.id,
+      action: 'cart',
+      category: product.category,
+      productType: 'Hardware',
+    });
 
     setAddedAnimation(true);
     setTimeout(() => setAddedAnimation(false), 2000);

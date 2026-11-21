@@ -9,6 +9,7 @@ import WebpayModal from './components/WebpayModal';
 import WebpayCallbackPage from './components/WebpayCallbackPage';
 import ProductDetailPage from './components/ProductDetailPage';
 import CloudOpsView from './components/CloudOpsView';
+import RecomendacionesSection from './components/RecomendacionesSection';
 import { SearchIcon, CartIcon, CloseIcon, CloudIcon, QueueIcon, ShieldCheckIcon } from './components/Icons';
 import './App.css';
 
@@ -83,10 +84,30 @@ function App() {
     const hash = window.location.hash || '';
     const search = window.location.search || '';
 
-    // 1. Retorno de Webpay Plus (/callback o ?token_ws=...)
-    if (pathname.includes('/callback') || hash.includes('/callback') || search.includes('token_ws')) {
-      const urlParams = new URLSearchParams(search || hash.split('?')[1] || '');
-      const token = urlParams.get('token_ws') || urlParams.get('token');
+    // Si el usuario navegó explícitamente por hash (#/, #/cloudops, #/dashboard, #/producto/:id),
+    // priorizarlo para no quedar atrapado en el pathname /callback previo
+    if (hash.startsWith('#/cloudops') || hash.startsWith('#/dashboard')) {
+      return { view: 'cloudops', param: null };
+    }
+    if (hash.startsWith('#/producto/')) {
+      return { view: 'product', param: hash.replace('#/producto/', '') };
+    }
+    if (hash === '#/' && !search.includes('token_ws') && !search.includes('TBK_TOKEN')) {
+      return { view: 'home', param: null };
+    }
+
+    // 1. Retorno de Webpay Plus (/callback o ?token_ws=... o ?TBK_TOKEN=...)
+    if (
+      pathname.includes('/callback') ||
+      hash.includes('/callback') ||
+      search.includes('token_ws') ||
+      search.includes('TBK_TOKEN') ||
+      search.includes('TBK_ID_SESION') ||
+      hash.includes('token_ws') ||
+      hash.includes('TBK_TOKEN')
+    ) {
+      const urlParams = new URLSearchParams(search || (hash.includes('?') ? hash.split('?')[1] : ''));
+      const token = urlParams.get('token_ws') || urlParams.get('token') || urlParams.get('TBK_TOKEN');
       return { view: 'callback', param: token };
     }
 
@@ -117,17 +138,27 @@ function App() {
     };
   }, []);
 
-  // Función unificada de navegación
+  // Función unificada de navegación que limpia parámetros transitorios de Webpay
   const navigateTo = (view, param = null) => {
+    let targetHash = '#/';
     if (view === 'home') {
-      window.location.hash = '#/';
+      targetHash = '#/';
       if (param) setSelectedCategory(param);
     } else if (view === 'product') {
-      window.location.hash = `#/producto/${param}`;
+      targetHash = `#/producto/${param}`;
     } else if (view === 'cloudops') {
-      window.location.hash = '#/cloudops';
+      targetHash = '#/cloudops';
     } else if (view === 'callback') {
-      window.location.hash = `#/callback${param ? `?token_ws=${param}` : ''}`;
+      targetHash = `#/callback${param ? `?token_ws=${param}` : ''}`;
+    }
+
+    if (typeof window !== 'undefined') {
+      if (window.location.pathname.includes('/callback') || window.location.search) {
+        window.history.replaceState(null, '', '/' + targetHash);
+      } else {
+        window.location.hash = targetHash;
+      }
+      setCurrentRoute(parseCurrentRoute());
     }
   };
 
@@ -338,7 +369,12 @@ function App() {
           <WebpayCallbackPage
             token={currentRoute.param}
             onReturnHome={() => navigateTo('home')}
+            onRetryPayment={() => {
+              navigateTo('home');
+              setIsCartOpen(true);
+            }}
             onReturnCloudOps={() => navigateTo('cloudops')}
+            onClearCart={handleClearCart}
           />
         </main>
       )}
@@ -347,7 +383,7 @@ function App() {
       {currentRoute.view === 'cloudops' && (
         <main className="app-main">
           {activeAccount ? (
-            <CloudOpsView />
+            <CloudOpsView activeAccount={activeAccount} />
           ) : (
             <div style={{ textAlign: 'center', padding: '5rem 1rem' }}>
               <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔒</div>
@@ -371,6 +407,7 @@ function App() {
             onNavigate={navigateTo}
             onAddToCart={handleAddToCart}
             cartItems={cartItems}
+            activeAccount={activeAccount}
           />
         </main>
       )}
@@ -406,6 +443,10 @@ function App() {
           </section>
 
           <main className="app-main">
+            <RecomendacionesSection
+              activeAccount={activeAccount}
+              onAddToCart={handleAddToCart}
+            />
             <Catalogo
               selectedCategory={selectedCategory}
               onSelectCategory={setSelectedCategory}
@@ -414,6 +455,7 @@ function App() {
               cartItems={cartItems}
               refreshTrigger={refreshStockCounter}
               onOpenProductDetail={(product) => navigateTo('product', product.id)}
+              activeAccount={activeAccount}
             />
           </main>
         </>

@@ -168,6 +168,40 @@ class WebSocketService {
     this.isConnected = false;
     this.notifyStatus('DISCONNECTED');
   }
+
+  /**
+   * Verifica si el socket STOMP/WebSocket sigue realmente abierto tras volver de segundo plano
+   */
+  isSocketActive() {
+    return Boolean(
+      this.isConnected &&
+      this.socket &&
+      typeof WebSocket !== 'undefined' &&
+      this.socket.readyState === WebSocket.OPEN
+    );
+  }
+
+  /**
+   * Fuerza la reconexión inmediata cuando el navegador reanuda la pestaña (visibilitychange -> visible)
+   */
+  ensureConnected(clientId = 'cloudops_operator') {
+    if (this.isSocketActive()) {
+      return false;
+    }
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    if (this.socket) {
+      try {
+        this.socket.close();
+      } catch {}
+      this.socket = null;
+    }
+    this.isConnected = false;
+    this.connect(clientId);
+    return true;
+  }
 }
 
 export const websocketService = new WebSocketService();

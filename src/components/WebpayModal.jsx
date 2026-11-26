@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { pagoService } from '../services/pagoService';
 import { analyticsService } from '../services/analyticsService';
 import { CloseIcon, ShieldCheckIcon } from './Icons';
 
 /**
  * Modal de Checkout con Webpay Plus y Motor Antifraude
- * Maneja el inicio de transacción, redirección oficial por POST y alertas de bloqueo (HTTP 429).
+ * Maneja el inicio de transacción, redirección oficial por POST y alertas de bloqueo (HTTP 403/429).
  */
 export const WebpayModal = ({
   isOpen,
@@ -16,20 +16,43 @@ export const WebpayModal = ({
   totalAmount,
   onPaymentSuccess,
 }) => {
-  if (!isOpen) return null;
-
   const [loading, setLoading] = useState(false);
   const [fraudAlert, setFraudAlert] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
   const [webpayData, setWebpayData] = useState(null);
+
+  const clientId = customerEmail || 'cliente@pedidos360.com';
+
+  // Validar en tiempo real contra estado_pago_cliente al abrir el modal
+  useEffect(() => {
+    if (!isOpen) return;
+    setWebpayData(null);
+    setErrorMessage(null);
+
+    pagoService.consultarEstadoCliente(clientId)
+      .then((estado) => {
+        if (estado && estado.bloqueado === true) {
+          setFraudAlert({
+            titulo: '🚨 CUENTA BLOQUEADA POR ANTIFRAUDE (HTTP 429)',
+            mensaje: 'Tu cuenta está bloqueada temporalmente por intentos inusuales. No es posible continuar hacia Webpay Plus durante 30 minutos.',
+            detalles: `Cliente penalizado en estado_pago_cliente (${estado.cantidadIntentos || '>3'} intentos detectados en ventana corta).`,
+          });
+        } else {
+          setFraudAlert(null);
+        }
+      })
+      .catch(() => {});
+  }, [isOpen, clientId]);
+
+  if (!isOpen) return null;
 
   // 1. Iniciar Transacción en Webpay Plus (evalúa regla antifraude en ms-pago)
   const handleIniciarWebpay = async () => {
     setLoading(true);
     setFraudAlert(null);
     setErrorMessage(null);
+    setWebpayData(null);
 
-    const clientId = customerEmail || 'cliente@pedidos360.com';
     const returnUrl = typeof window !== 'undefined' ? `${window.location.origin}/callback` : '/callback';
     const transactionId = `TX-${Date.now()}-${Math.random().toString(36).substring(7).toUpperCase()}`;
 
@@ -40,6 +63,12 @@ export const WebpayModal = ({
         transactionId,
         returnUrl,
       });
+
+      if (data?.bloqueado === true || data?.status === 'BLOQUEADO_POR_FRAUDE') {
+        const err = new Error(data.mensaje || 'Tu cuenta está bloqueada temporalmente por intentos inusuales.');
+        err.status = 429;
+        throw err;
+      }
 
       // Guardar contexto del pedido en sessionStorage para registrar evento 'purchase' al volver a /callback
       if (typeof window !== 'undefined') {
@@ -64,17 +93,18 @@ export const WebpayModal = ({
 
       setWebpayData(data); // Contiene { url, token, transactionId }
     } catch (err) {
-      if (err.status === 429) {
-        // Bloqueo preventivo por regla antifraude (>3 intentos en 10 seg)
-        const msg = err.message || 'Se detectaron más de 3 transacciones en menos de 10 segundos. La cuenta ha sido bloqueada temporalmente por 30 minutos.';
+      if (err.status === 429 || err.status === 403 || (err.message && err.message.includes('bloquead'))) {
+        // Bloqueo preventivo por regla antifraude (>3 intentos en 10 seg o bloqueado == true en BD)
+        const msg = err.message || 'Tu cuenta está bloqueada temporalmente por intentos inusuales (más de 3 transacciones en menos de 10 segundos).';
+        setWebpayData(null);
         setFraudAlert({
-          titulo: '🚨 BLOQUEO PREVENTIVO DE SEGURIDAD (HTTP 429)',
+          titulo: `🚨 BLOQUEO PREVENTIVO DE SEGURIDAD (HTTP ${err.status || 429})`,
           mensaje: msg,
-          detalles: 'Protocolo de protección contra ataques de fuerza bruta y transacciones repetitivas.',
+          detalles: 'Tu cuenta registra bloqueado = true en estado_pago_cliente. Redirección a Transbank Webpay Plus denegada.',
         });
         analyticsService.registrarAlertaFraude({
           clientId,
-          razon: `Bloqueo 429 en Checkout Webpay: ${msg}`,
+          razon: `Bloqueo Antifraude en Checkout Webpay: ${msg}`,
         });
       } else {
         setErrorMessage(err.message || 'No se pudo conectar con el microservicio de Pagos.');

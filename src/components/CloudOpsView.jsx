@@ -283,7 +283,25 @@ export const CloudOpsView = ({ activeAccount }) => {
       applyMetricsPayload(message);
     });
 
+    // 3. Reconectar WebSocket STOMP y recargar métricas cuando la pestaña vuelve a estar visible
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        websocketService.ensureConnected('cloudops_operator');
+        analyticsService.sincronizarMetricasAlVolver().then((snapshot) => {
+          if (snapshot) applyMetricsPayload(snapshot);
+        });
+        loadUserRecommendations(currentUserId);
+      }
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+
     return () => {
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
       unsubscribeStatus();
       unsubscribeMessages();
       websocketService.disconnect();
@@ -354,7 +372,8 @@ export const CloudOpsView = ({ activeAccount }) => {
     const timeStr = timestamp.toLocaleTimeString();
 
     if (actionType === 'FRAUD_SIMULATION') {
-      const botClient = `test.burst.${Math.floor(Math.random() * 900 + 100)}@pedidos360.com`;
+      // Bloquear al usuario activo en estado_pago_cliente para que el bloqueo 429 impida compras posteriores en Webpay
+      const botClient = currentUserId || activeAccount?.username || 'cliente@pedidos360.com';
       let blocked429Detected = false;
 
       // Enviar 4 intentos en ráfaga (<10s) hacia POST /api/pagos/iniciar para activar el bloqueo real HTTP 429

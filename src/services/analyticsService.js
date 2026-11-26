@@ -97,6 +97,15 @@ export const analyticsService = {
       return null;
     }
   },
+
+  /**
+   * 6. Sincronizar estado completo de métricas al recuperar visibilidad de la pestaña
+   */
+  async sincronizarMetricasAlVolver() {
+    const snapshot = await this.obtenerMetricas();
+    const emitted = await this.forzarEmisionMetricas();
+    return emitted?.metricas || snapshot;
+  },
 };
 
 export default analyticsService;

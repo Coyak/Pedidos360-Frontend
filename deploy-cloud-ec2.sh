@@ -312,6 +312,8 @@ services:
     depends_on:
       rabbitmq1:
         condition: service_healthy
+      kafka:
+        condition: service_started
     ports:
       - "8083:8083"
     environment:
@@ -319,6 +321,7 @@ services:
       RABBITMQ_PORT: "${RABBITMQ_PORT:-5672}"
       RABBITMQ_USERNAME: "${RABBITMQ_USERNAME:-pedidos360_user}"
       RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD:-pedidos360_pass}"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: "${SPRING_KAFKA_BOOTSTRAP_SERVERS:-kafka:29092}"
       SERVER_PORT: 8083
     networks:
       - pedidos360-network
